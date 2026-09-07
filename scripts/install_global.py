@@ -23,6 +23,16 @@ MANAGED_AGENTS = {
     "default_subagent_model": "gpt-5.6-luna",
     "default_subagent_reasoning_effort": "medium",
 }
+MANAGED_AGENT_ROLE_CONFIGS = {
+    "explorer": "agents/explorer.toml",
+    "researcher": "agents/researcher.toml",
+    "tester": "agents/tester.toml",
+    "fast_worker": "agents/fast_worker.toml",
+    "worker": "agents/worker.toml",
+    "expert": "agents/expert.toml",
+    "reviewer": "agents/reviewer.toml",
+    "deep_reviewer": "agents/deep_reviewer.toml",
+}
 
 SECTION_RE = re.compile(r"^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$")
 TOP_KEY_RE = re.compile(r"^\s*(model|model_reasoning_effort)\s*=")
@@ -38,7 +48,7 @@ def backup(path: Path):
 
 
 def root_model_for(root: str) -> str:
-    return "gpt-6-astra" if root == "astra" else "gpt-5.6-sol"
+    return "gpt-5.6-terra" if root == "terra" else "gpt-5.6-sol"
 
 
 def parse_toml(text: str):
@@ -49,7 +59,7 @@ def parse_toml(text: str):
 
 
 def managed_block(root_model: str) -> str:
-    effort = "low" if root_model == "gpt-6-astra" else "medium"
+    effort = "medium"
     lines = [
         MANAGED_START,
         f'model = "{root_model}"',
@@ -64,6 +74,8 @@ def managed_block(root_model: str) -> str:
             lines.append(f"{k} = {v}")
         else:
             lines.append(f'{k} = "{v}"')
+    for role, config_file in MANAGED_AGENT_ROLE_CONFIGS.items():
+        lines.extend(["", f"[agents.{role}]", f'config_file = "{config_file}"'])
     lines.append(MANAGED_END)
     return "\n".join(lines)
 
@@ -85,8 +97,9 @@ def merge_config(existing: str, root_model: str) -> str:
       2. the Smart Router managed block (root model + `[agents]` table)
       3. every other table from the original file, in original order
 
-    Only the body of a bare `[agents]` table is replaced. Sub-tables such as
-    `[agents.roles.x]` and all other tables are preserved verbatim.
+    The bare `[agents]` table and the eight Smart Router role-registration
+    subtables are replaced. Other user-defined `[agents.*]` subtables and all
+    unrelated tables are preserved verbatim.
     """
     top = []
     rest = []
@@ -99,7 +112,9 @@ def merge_config(existing: str, root_model: str) -> str:
         m = SECTION_RE.match(line)
         if m:
             section = m.group(1).strip()
-            skip_agents_body = section == "agents"
+            skip_agents_body = section == "agents" or section in {
+                f"agents.{role}" for role in MANAGED_AGENT_ROLE_CONFIGS
+            }
             if not skip_agents_body:
                 rest.append(line)
             continue
@@ -154,6 +169,11 @@ def validate_merged(existing: str, merged: str, root_model: str) -> dict:
         if key == "agents":
             # user sub-tables under agents must survive, scalar keys are managed
             for sub_k, sub_v in value.items() if isinstance(value, dict) else []:
+                if sub_k in MANAGED_AGENT_ROLE_CONFIGS:
+                    expected = {"config_file": MANAGED_AGENT_ROLE_CONFIGS[sub_k]}
+                    if agents.get(sub_k) != expected:
+                        raise ValueError(f"merged config: agents.{sub_k} registration is invalid")
+                    continue
                 if isinstance(sub_v, dict) and agents.get(sub_k) != sub_v:
                     raise ValueError(f"merged config lost agents.{sub_k}")
             continue
@@ -186,14 +206,19 @@ def merge_agents_md(existing: str, block: str) -> str:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--root", choices=["astra", "sol"], default="astra")
+    p.add_argument("--root", choices=["terra", "sol"], default="terra",
+                   help="root model profile; Terra is the default, Sol is an emergency fallback")
     p.add_argument("--home", default=str(Path.home()))
+    p.add_argument("--codex-dir", help="override the Codex directory; enables safe project-scoped installation")
+    p.add_argument("--skills-dir", help="override the skills directory; defaults to <home>/.agents/skills")
+    p.add_argument("--agents-md", help="override the AGENTS.md path; defaults to <codex-dir>/AGENTS.md")
     args = p.parse_args()
 
     home = Path(args.home).expanduser().resolve()
-    codex = home / ".codex"
+    codex = Path(args.codex_dir).expanduser().resolve() if args.codex_dir else home / ".codex"
     agents_dir = codex / "agents"
-    skills_dir = home / ".agents" / "skills"
+    skills_dir = (Path(args.skills_dir).expanduser().resolve()
+                  if args.skills_dir else home / ".agents" / "skills")
     agents_dir.mkdir(parents=True, exist_ok=True)
     skills_dir.mkdir(parents=True, exist_ok=True)
 
@@ -222,7 +247,8 @@ def main():
     if cfg.exists(): backup(cfg)
     cfg.write_text(merged, encoding="utf-8")
 
-    global_agents = codex / "AGENTS.md"
+    global_agents = (Path(args.agents_md).expanduser().resolve()
+                     if args.agents_md else codex / "AGENTS.md")
     existing_agents = global_agents.read_text(encoding="utf-8") if global_agents.exists() else ""
     if global_agents.exists(): backup(global_agents)
     block = (SRC_GLOBAL / ".codex" / "AGENTS.md").read_text(encoding="utf-8")

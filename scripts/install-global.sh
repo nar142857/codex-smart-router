@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="${1:-astra}"
-if [[ "$ROOT" != "astra" && "$ROOT" != "sol" ]]; then
-  echo "Usage: ./install-global.sh [astra|sol]"
+ROOT="${1:-terra}"
+if [[ "$ROOT" != "terra" && "$ROOT" != "sol" ]]; then
+  echo "Usage: ./install-global.sh [terra|sol]"
   exit 2
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

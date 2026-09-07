@@ -23,8 +23,8 @@
 ## Multi-agent routing
 Use `$smart-router` for non-trivial work.
 - Luna: exploration/research/tests/obvious low-risk edits.
-- Terra: normal implementation.
+- Terra Medium: default root/orchestrator and normal implementation.
 - Sol: hard debugging, architecture-sensitive logic, algorithms/concurrency/performance, substantial review.
-- Astra: root/orchestration; deep review only for very high-risk changes.
+- Astra: exceptional high-risk deep review only; never use it for routine exploration, implementation, testing, summaries, or ordinary review.
 
 Do not use multi-agent delegation for trivial one-file edits unless it clearly reduces context or latency.

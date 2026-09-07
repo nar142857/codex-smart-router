@@ -1,11 +1,11 @@
-# Codex Smart Router — Astra / Sol / Terra / Luna
+# Codex Smart Router v2 — Terra / Luna / Sol / Astra
 
 一套可直接复制/安装到 Codex 的多 Agent 路由配置，目标是：**尽量保持复杂任务质量，同时减少高价模型的无效 token 消耗。**
 
 ## 默认拓扑
 
 ```text
-                 GPT-6 Astra root
+             GPT-5.6 Terra Medium root
              plan / decide / integrate
                       |
         +-------------+-------------+
@@ -19,16 +19,16 @@
  fast_worker
                       |
              Astra deep_reviewer
-              only high-risk
+      exceptional high-risk only
 ```
 
 ## 路由原则
 
 - 小任务：root 直接做，不机械启动 subagents。
 - Luna：搜索、读代码、研究、测试、非常明确的低风险小改动。
-- Terra：默认实现模型，承担常规 feature / refactor / bugfix。
+- Terra Medium：默认 Root / Orchestrator，并承担常规 feature / refactor / bugfix。
 - Sol：困难 Bug、算法、并发、性能、复杂集成、独立 Review。
-- Astra：主要作为根 Agent 做理解、拆解、架构判断、最终整合；只有非常高风险任务才再启用 Astra `deep_reviewer`。
+- Astra：只用于认证授权、安全边界、支付、破坏性迁移或极复杂架构等高风险场景的 `deep_reviewer`；不得用于日常搜索、实现、测试、总结或普通 Review。
 - 默认最多 4 个 subagent 并发。
 
 ## 版本要求
@@ -36,9 +36,9 @@
 建议使用最新 Codex App / Codex CLI。
 
 - GPT-5.6 在 Codex 至少需要较新的 0.144.x 以上版本。
-- GPT-6 Astra 需要 Codex CLI 0.153.0 或更新版本，并且 Astra 仍可能处于账户逐步开放阶段。
+- GPT-6 Astra 仅在实际需要深度复核时才会被调用，且可能仍处于账户逐步开放阶段。
 
-如果 Astra 在你的 Codex 账户暂不可用，使用 `sol` 根模型即可，其他路由逻辑不变。
+默认安装使用 Terra Root；如 Terra 临时不可用，可切换为 Sol fallback，其他角色映射不变。
 
 ---
 
@@ -53,10 +53,10 @@
 ```bash
 cd codex-smart-router
 chmod +x scripts/install-global.sh
-./scripts/install-global.sh astra
+./scripts/install-global.sh terra
 ```
 
-如果 Astra 暂不可用：
+如 Terra 临时不可用：
 
 ```bash
 ./scripts/install-global.sh sol
@@ -67,18 +67,19 @@ chmod +x scripts/install-global.sh
 - 安装角色到 `~/.codex/agents/`
 - 安装 Skill 到 `~/.agents/skills/smart-router/`
 - 合并路由规则到 `~/.codex/AGENTS.md`
-- 合并 `~/.codex/config.toml` 中的 root model 和 `[agents]` 设置
+- 合并 `~/.codex/config.toml` 中的 root model、`[agents]` 设置及 8 个角色注册
 - 保留你其他 config section，例如 MCP server / provider / permissions
+- 项目级安装同样采用备份、合并和 TOML 校验，不覆盖项目已有的顶层配置或 AGENTS 规则
 - 修改已有文件前自动生成 `.bak-时间戳` 备份
 
 ## Windows PowerShell
 
 ```powershell
 cd codex-smart-router
-powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root astra
+powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root terra
 ```
 
-Astra 暂不可用：
+Terra 临时不可用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root sol
@@ -97,10 +98,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root sol
 ## macOS / Linux
 
 ```bash
-./scripts/install-project.sh /path/to/your/repo astra
+./scripts/install-project.sh /path/to/your/repo terra
 ```
 
-Astra 暂不可用：
+Terra 临时不可用：
 
 ```bash
 ./scripts/install-project.sh /path/to/your/repo sol
@@ -109,7 +110,7 @@ Astra 暂不可用：
 ## Windows PowerShell
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-project.ps1 -Target "D:\Projects\MyApp" -Root astra
+powershell -ExecutionPolicy Bypass -File .\scripts\install-project.ps1 -Target "D:\Projects\MyApp" -Root terra
 ```
 
 项目最终会包含：
@@ -145,7 +146,7 @@ repo/
 常规实现 -> Terra
 搜索/测试 -> Luna
 难点 -> Sol
-高风险判断/最终整合 -> Astra
+极高风险深度复核 -> Astra
 ```
 
 ## 2. 显式调用路由 Skill
@@ -158,7 +159,7 @@ $smart-router
 实现完整的支付退款功能。
 先分析现有支付调用链，再制定实现边界。
 常规实现用 Terra，测试用 Luna；
-只有困难或高风险部分才升级 Sol/Astra。
+只有真正困难的实现才升级 Sol；极高风险时才启用 Astra deep review。
 ```
 
 ## 3. Smoke Test
@@ -204,7 +205,7 @@ $smart-router
 
 ---
 
-# Astra 暂不可用
+# Terra 临时不可用
 
 使用：
 
@@ -221,13 +222,13 @@ fallbacks/config-root-sol.toml
 这会变成：
 
 ```text
-Sol root
+Sol fallback root
   -> Luna search/test
   -> Terra normal implementation
   -> Sol hard work/review
 ```
 
-依然可以正常工作，只是没有 Astra 总控。
+依然可以正常工作；Astra 始终只保留给极高风险的 deep review。
 
 ---
 

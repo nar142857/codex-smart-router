@@ -1,4 +1,4 @@
-# Use this if GPT-6 Astra has not rolled out to your Codex account yet.
+# Emergency fallback when Terra is unavailable in the current Codex account.
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 

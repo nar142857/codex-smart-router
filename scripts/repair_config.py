@@ -86,12 +86,12 @@ def detect_root(text: str) -> str:
     m = re.search(r'^\s*model\s*=\s*"([^"]+)"', text, re.M)
     if m and m.group(1) == "gpt-5.6-sol":
         return "sol"
-    return "astra"
+    return "terra"
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", choices=["astra", "sol", "auto"], default="auto",
+    p.add_argument("--root", choices=["terra", "sol", "auto"], default="auto",
                    help="root model; 'auto' keeps whatever the current config uses (default)")
     p.add_argument("--home", default=str(Path.home()))
     p.add_argument("--backup", help="explicit clean backup to restore from (skips auto detection)")

@@ -1,13 +1,37 @@
-# Codex Smart Router — default profile
-# Root/orchestrator: GPT-6 Astra
+# Codex Smart Router — Terra-default profile
+# Root/orchestrator: GPT-5.6 Terra Medium
 # Cheap/default subagents: GPT-5.6 Luna
-# If Astra is not available yet, use the Sol fallback in /fallbacks.
+# If Terra is temporarily unavailable, use the Sol fallback in /fallbacks.
 
-model = "gpt-6-astra"
-model_reasoning_effort = "low"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 4
 default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "medium"
+
+[agents.explorer]
+config_file = "agents/explorer.toml"
+
+[agents.researcher]
+config_file = "agents/researcher.toml"
+
+[agents.tester]
+config_file = "agents/tester.toml"
+
+[agents.fast_worker]
+config_file = "agents/fast_worker.toml"
+
+[agents.worker]
+config_file = "agents/worker.toml"
+
+[agents.expert]
+config_file = "agents/expert.toml"
+
+[agents.reviewer]
+config_file = "agents/reviewer.toml"
+
+[agents.deep_reviewer]
+config_file = "agents/deep_reviewer.toml"

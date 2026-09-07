@@ -1,6 +1,6 @@
 param(
-  [ValidateSet("astra","sol")]
-  [string]$Root = "astra"
+  [ValidateSet("terra","sol")]
+  [string]$Root = "terra"
 )
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Python = Get-Command python -ErrorAction SilentlyContinue

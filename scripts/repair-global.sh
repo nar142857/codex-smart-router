@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Repair a ~/.codex/config.toml broken by an older Smart Router installer.
-# See HOTFIX.md. Usage: ./repair-global.sh [astra|sol|auto]
+# See HOTFIX.md. Usage: ./repair-global.sh [terra|sol|auto]
 set -euo pipefail
 ROOT="${1:-auto}"
-if [[ "$ROOT" != "astra" && "$ROOT" != "sol" && "$ROOT" != "auto" ]]; then
-  echo "Usage: ./repair-global.sh [astra|sol|auto]"
+if [[ "$ROOT" != "terra" && "$ROOT" != "sol" && "$ROOT" != "auto" ]]; then
+  echo "Usage: ./repair-global.sh [terra|sol|auto]"
   exit 2
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

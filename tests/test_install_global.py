@@ -19,10 +19,10 @@ trust_level = "trusted"
 command = "foo"
 '''
 
-# What the old installer produced for USER_CONFIG.
+# What the old installer produced when it accidentally nested user keys in [agents].
 BROKEN_CONFIG = '''# --- Smart Router managed block ---
-model = "gpt-6-astra"
-model_reasoning_effort = "low"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 
 [agents]
 enabled = true
@@ -51,36 +51,48 @@ def assert_smart_router_merge(tc, doc):
     tc.assertEqual(doc["agents"]["max_concurrent_threads_per_session"], 4)
     tc.assertEqual(doc["agents"]["default_subagent_model"], "gpt-5.6-luna")
     tc.assertEqual(doc["agents"]["default_subagent_reasoning_effort"], "medium")
+    expected_roles = {
+        "explorer": "agents/explorer.toml",
+        "researcher": "agents/researcher.toml",
+        "tester": "agents/tester.toml",
+        "fast_worker": "agents/fast_worker.toml",
+        "worker": "agents/worker.toml",
+        "expert": "agents/expert.toml",
+        "reviewer": "agents/reviewer.toml",
+        "deep_reviewer": "agents/deep_reviewer.toml",
+    }
+    for role, config_file in expected_roles.items():
+        tc.assertEqual(doc["agents"][role], {"config_file": config_file})
     tc.assertEqual(doc["projects"]["/Users/test/repo"]["trust_level"], "trusted")
     tc.assertEqual(doc["mcp_servers"]["foo"]["command"], "foo")
 
 
 class MergeConfigTest(unittest.TestCase):
     def test_top_level_keys_stay_before_tables(self):
-        merged = ig.merge_and_validate(USER_CONFIG, "gpt-6-astra")
+        merged = ig.merge_and_validate(USER_CONFIG, "gpt-5.6-terra")
         doc = tomllib.loads(merged)
         assert_smart_router_merge(self, doc)
-        self.assertEqual(doc["model"], "gpt-6-astra")
-        self.assertEqual(doc["model_reasoning_effort"], "low")
+        self.assertEqual(doc["model"], "gpt-5.6-terra")
+        self.assertEqual(doc["model_reasoning_effort"], "medium")
         # textual layout: every top-level key precedes the first table header
         first_table = merged.index("[")
         for key in ("approval_policy", "sandbox_mode", "model =", "model_reasoning_effort"):
             self.assertLess(merged.index(key), first_table, key)
 
-    def test_sol_root(self):
+    def test_sol_fallback_root(self):
         doc = tomllib.loads(ig.merge_and_validate(USER_CONFIG, "gpt-5.6-sol"))
         self.assertEqual(doc["model"], "gpt-5.6-sol")
         self.assertEqual(doc["model_reasoning_effort"], "medium")
         assert_smart_router_merge(self, doc)
 
     def test_empty_config(self):
-        doc = tomllib.loads(ig.merge_and_validate("", "gpt-6-astra"))
+        doc = tomllib.loads(ig.merge_and_validate("", "gpt-5.6-terra"))
         self.assertIs(doc["agents"]["enabled"], True)
-        self.assertEqual(doc["model"], "gpt-6-astra")
+        self.assertEqual(doc["model"], "gpt-5.6-terra")
 
     def test_idempotent(self):
-        once = ig.merge_and_validate(USER_CONFIG, "gpt-6-astra")
-        twice = ig.merge_and_validate(once, "gpt-6-astra")
+        once = ig.merge_and_validate(USER_CONFIG, "gpt-5.6-terra")
+        twice = ig.merge_and_validate(once, "gpt-5.6-terra")
         self.assertEqual(once, twice)
         self.assertEqual(once.count("[agents]"), 1)
         self.assertEqual(once.count(ig.MANAGED_START), 1)
@@ -102,9 +114,9 @@ max_concurrent_threads_per_session = 1
 [agents.roles.helper]
 model = "x"
 '''
-        merged = ig.merge_and_validate(existing, "gpt-6-astra")
+        merged = ig.merge_and_validate(existing, "gpt-5.6-terra")
         doc = tomllib.loads(merged)
-        self.assertEqual(doc["model"], "gpt-6-astra")
+        self.assertEqual(doc["model"], "gpt-5.6-terra")
         self.assertEqual(doc["approval_policy"], "on-request")
         self.assertEqual(doc["model_provider"], "custom")
         self.assertEqual(doc["model_providers"]["custom"]["base_url"], "http://localhost:1234/v1")
@@ -114,7 +126,7 @@ model = "x"
 
     def test_validation_rejects_leaked_top_level_key(self):
         with self.assertRaises(ValueError):
-            ig.validate_merged(USER_CONFIG, BROKEN_CONFIG, "gpt-6-astra")
+            ig.validate_merged(USER_CONFIG, BROKEN_CONFIG, "gpt-5.6-terra")
 
 
 class InstallerEndToEndTest(unittest.TestCase):
@@ -124,9 +136,30 @@ class InstallerEndToEndTest(unittest.TestCase):
             codex.mkdir()
             (codex / "config.toml").write_text(USER_CONFIG, encoding="utf-8")
             subprocess.run([sys.executable, str(ROOT / "scripts" / "install_global.py"),
-                            "--root", "astra", "--home", home], check=True, capture_output=True)
+                            "--root", "terra", "--home", home], check=True, capture_output=True)
             doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
             assert_smart_router_merge(self, doc)
+            self.assertTrue(list(codex.glob("config.toml.bak-*")))
+
+    def test_project_scoped_install_preserves_existing_config_and_instructions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            codex = project / ".codex"
+            codex.mkdir()
+            (codex / "config.toml").write_text(USER_CONFIG, encoding="utf-8")
+            (project / "AGENTS.md").write_text("# Existing project instructions\n", encoding="utf-8")
+            subprocess.run([
+                sys.executable, str(ROOT / "scripts" / "install_global.py"), "--root", "terra",
+                "--codex-dir", str(codex), "--skills-dir", str(project / ".agents" / "skills"),
+                "--agents-md", str(project / "AGENTS.md"),
+            ], check=True, capture_output=True)
+            doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
+            assert_smart_router_merge(self, doc)
+            instructions = (project / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("# Existing project instructions", instructions)
+            self.assertIn("Default root/orchestrator: GPT-5.6 Terra Medium.", instructions)
+            self.assertTrue((project / ".agents" / "skills" / "smart-router" / "SKILL.md").is_file())
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
 
 
@@ -153,7 +186,7 @@ class RepairTest(unittest.TestCase):
             self.assertIn("config.toml.bak-20260101-000000", res.stdout)
             doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
             assert_smart_router_merge(self, doc)
-            self.assertEqual(doc["model"], "gpt-6-astra")
+            self.assertEqual(doc["model"], "gpt-5.6-terra")
             self.assertTrue(list(codex.glob("config.toml.broken-*")))
 
     def test_repair_without_backup_hoists_keys(self):

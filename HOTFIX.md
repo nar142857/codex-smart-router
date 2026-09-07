@@ -42,7 +42,7 @@ Codex 因此把 `"never"` 当成一个 agent role 去解析而失败。
 cd codex-smart-router
 chmod +x scripts/repair-global.sh
 ./scripts/repair-global.sh          # 自动沿用当前 root model
-./scripts/repair-global.sh sol      # 或显式指定 astra / sol
+./scripts/repair-global.sh terra    # 或显式指定 terra / sol
 ```
 
 修复脚本会：
