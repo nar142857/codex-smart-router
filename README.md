@@ -86,6 +86,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root sol
 
 安装完成后**完全退出并重启 Codex App / CLI**。
 
+> 如果安装后 Codex 报 `expected struct AgentRoleToml in \`agents\``，请运行 `./scripts/repair-global.sh`，详见 [HOTFIX.md](HOTFIX.md)。
+
 ---
 
 # 方案 B：项目级安装
