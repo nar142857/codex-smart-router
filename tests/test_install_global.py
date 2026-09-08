@@ -144,6 +144,18 @@ class InstallerEndToEndTest(unittest.TestCase):
             doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
             assert_smart_router_merge(self, doc)
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
+            self.assertIn("token_usage_report = true", (codex / "smart-router.toml").read_text(encoding="utf-8"))
+
+    def test_installer_keeps_skill_backups_outside_the_scanned_skills_directory(self):
+        with tempfile.TemporaryDirectory() as home:
+            skills = Path(home) / ".agents" / "skills" / "smart-router"
+            skills.mkdir(parents=True)
+            (skills / "SKILL.md").write_text("old skill", encoding="utf-8")
+            subprocess.run([sys.executable, str(ROOT / "scripts" / "install_global.py"),
+                            "--home", home], check=True, capture_output=True)
+            self.assertTrue((skills / "SKILL.md").is_file())
+            self.assertFalse(list(skills.parent.glob("smart-router.bak-*")))
+            self.assertTrue(list((skills.parent.parent / "skills-backups").glob("smart-router.bak-*")))
 
     def test_install_can_set_an_optional_default_model(self):
         with tempfile.TemporaryDirectory() as home:
@@ -194,6 +206,8 @@ class RemoteBootstrapTest(unittest.TestCase):
             self.assertIn("# Existing project instructions", instructions)
             self.assertIn("Root/orchestrator: use the model selected for the current Codex conversation.", instructions)
             self.assertTrue((project / ".agents" / "skills" / "smart-router" / "SKILL.md").is_file())
+            self.assertTrue((project / ".agents" / "skills" / "smart-router" / "scripts" / "token_report.py").is_file())
+            self.assertIn("token_usage_report = true", (codex / "smart-router.toml").read_text(encoding="utf-8"))
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
 
 

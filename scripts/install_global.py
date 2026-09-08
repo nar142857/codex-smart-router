@@ -249,8 +249,14 @@ def main():
     dst_skill = skills_dir / "smart-router"
     if dst_skill.exists():
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        shutil.move(str(dst_skill), str(dst_skill.with_name(dst_skill.name + f".bak-{stamp}")))
+        backups_dir = skills_dir.parent / "skills-backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(dst_skill), str(backups_dir / f"smart-router.bak-{stamp}"))
     shutil.copytree(src_skill, dst_skill)
+
+    settings = codex / "smart-router.toml"
+    if not settings.exists():
+        shutil.copy2(SRC_GLOBAL / ".codex" / "smart-router.toml", settings)
 
     if cfg.exists(): backup(cfg)
     cfg.write_text(merged, encoding="utf-8")
@@ -271,6 +277,7 @@ def main():
     print(f"Agents: {agents_dir}")
     print(f"Skill: {dst_skill}")
     print(f"Global instructions: {global_agents}")
+    print(f"Token report setting: {settings}")
     print("Restart Codex after installation.")
 
 if __name__ == "__main__":

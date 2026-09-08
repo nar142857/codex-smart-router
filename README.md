@@ -108,6 +108,7 @@ chmod +x scripts/install-global.sh
 - 合并 `~/.codex/config.toml` 中的 `[agents]` 设置及 8 个角色注册；不写入 Root 模型
 - 保留你其他 config section，例如 MCP server / provider / permissions
 - 项目级安装同样采用备份、合并和 TOML 校验，不覆盖项目已有的顶层配置或 AGENTS 规则
+- 新增 `~/.codex/smart-router.toml`，默认在任务结束时显示 root 与各 subagent 的 token 用量快照
 - 修改已有文件前自动生成 `.bak-时间戳` 备份
 
 ## Windows PowerShell
@@ -160,6 +161,20 @@ repo/
 ---
 
 # 怎么使用
+
+## 任务结束时的 Token 用量报告
+
+安装后默认开启。每个任务完成时，Root 会在最终回复中附加本次 root turn 的快照，分别列出 root 和每个实际运行过的 subagent 的输入、缓存输入、输出及总 token。由于快照生成在最终回复之前，最终回复本身消耗的 token 不包含在该表中；缓存输入已包含在输入 token 内。
+
+全局关闭：编辑 `~/.codex/smart-router.toml`：
+
+```toml
+token_usage_report = false
+```
+
+项目级关闭：在项目根目录创建或编辑 `.codex/smart-router.toml`，写入相同设置。项目设置优先于全局设置。重新设为 `true` 或删除该行即可恢复；没有配置文件时默认开启。
+
+需要手动查看当前任务快照时，运行已安装 Smart Router skill 中的 `scripts/token_report.py`。项目级安装时该文件位于 `.agents/skills/smart-router/scripts/token_report.py`。
 
 ## 1. 普通使用：让 Codex 自动判断
 

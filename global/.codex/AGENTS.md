@@ -16,4 +16,21 @@ Routing policy:
 - Subagents return concise conclusions, file/symbol references, validation results, and risks rather than long transcripts.
 - Root owns architecture, scope decisions, integration, conflict resolution, and final acceptance.
 
+## Task-completion token report
+
+By default, before the final reply of a task, run the installed Smart Router
+`scripts/token_report.py` and append its Markdown output unchanged. It reports
+the current root turn's token snapshot for root and every subagent that has
+logged usage. The snapshot necessarily excludes the final reply's own model
+call.
+
+Users can disable this per project with `.codex/smart-router.toml`, or globally
+with `~/.codex/smart-router.toml`:
+
+```toml
+token_usage_report = false
+```
+
+The project setting takes priority. If neither file exists, reporting remains enabled.
+
 If a repository contains its own AGENTS.md, obey the more specific project rules as well.

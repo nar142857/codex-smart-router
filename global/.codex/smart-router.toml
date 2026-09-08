@@ -1,0 +1,3 @@
+# Smart Router optional task-completion report.
+# Set to false to omit the per-agent token snapshot from final task replies.
+token_usage_report = true
