@@ -1,3 +1,7 @@
 # Smart Router optional task-completion report.
 # Set to false to omit the per-agent token snapshot from final task replies.
+# The report shows API-equivalent USD and estimated Codex credits. It cannot
+# read a user's subscription balance, so Task share is within the current task.
+# Optionally set quota_budget_credits = 1000 to show each agent's estimated
+# percentage of your chosen budget; it is not a live account-balance lookup.
 token_usage_report = true

@@ -16,15 +16,17 @@ This script:
   4. re-applies the Smart Router settings with the fixed merge logic
 """
 from pathlib import Path
-import argparse, datetime, re, shutil, sys
+import argparse, re, shutil, sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from install_global import (  # noqa: E402
     MANAGED_AGENTS, MANAGED_START, SECTION_RE, merge_and_validate, parse_toml,
+    unique_backup_path,
 )
 
-# Only backups written by the installer itself (config.toml.bak-YYYYMMDD-HHMMSS).
-BACKUP_RE = re.compile(r"^config\.toml\.bak-(\d{8}-\d{6})$")
+# Only backups written by the installer itself. The optional counter prevents
+# collisions when more than one backup is made in the same second.
+BACKUP_RE = re.compile(r"^config\.toml\.bak-(\d{8}-\d{6})(?:-(\d+))?$")
 
 
 def is_clean_backup(text: str) -> bool:
@@ -45,7 +47,9 @@ def is_clean_backup(text: str) -> bool:
 
 def find_clean_backup(cfg: Path):
     candidates = [p for p in cfg.parent.iterdir() if BACKUP_RE.match(p.name)]
-    candidates.sort(key=lambda p: BACKUP_RE.match(p.name).group(1), reverse=True)
+    candidates.sort(key=lambda p: (
+        BACKUP_RE.match(p.name).group(1), int(BACKUP_RE.match(p.name).group(2) or 0),
+    ), reverse=True)
     for cand in candidates:
         try:
             text = cand.read_text(encoding="utf-8")
@@ -122,8 +126,7 @@ def main():
         sys.stdout.write(merged)
         return 0
 
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    broken = cfg.with_name(cfg.name + f".broken-{stamp}")
+    broken = unique_backup_path(cfg, "broken")
     shutil.copy2(cfg, broken)
     cfg.write_text(merged, encoding="utf-8")
 

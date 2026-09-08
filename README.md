@@ -164,7 +164,15 @@ repo/
 
 ## 任务结束时的 Token 用量报告
 
-安装后默认开启。每个任务完成时，Root 会在最终回复中附加本次 root turn 的快照，分别列出 root 和每个实际运行过的 subagent 的输入、缓存输入、输出及总 token。由于快照生成在最终回复之前，最终回复本身消耗的 token 不包含在该表中；缓存输入已包含在输入 token 内。
+安装后默认开启。每个任务完成时，Root 会在最终回复中附加本次 root turn 的快照，分别列出 root 和每个实际运行过的 subagent 的输入、缓存输入、缓存命中率、输出及总 token。子代理名称取自会话元数据中的实际角色（例如 `explorer`、`tester`），不会因为 `turn_context.task_path` 缺失而错误显示为 `root`。
+
+报告还会显示两类估算：`Est. credits` 是按模型 token 费率换算的 Codex credit 参考值，`Task share` 是该 agent 占本任务估算 credits 的比例。`Budget quota` 需要你显式设置一个预算分母才会显示；它不是账户剩余额度，因为本地会话日志不含套餐上限或实时余额。`Est. API cost` 是按 OpenAI 公开 API 单价计算的美元等价值，仅用于比较，不是订阅或 Codex 的账单。费率在包内固定为 2026-09-08 的参考值，未知模型显示 `N/A`。由于快照生成在最终回复之前，最终回复本身消耗的 token 不包含在该表中；缓存输入已包含在输入 token 内。
+
+如果希望用你的内部额度预算查看 `Budget quota`，在全局 `~/.codex/smart-router.toml` 或项目 `.codex/smart-router.toml` 中增加正数（项目级优先）：
+
+```toml
+quota_budget_credits = 1000
+```
 
 全局关闭：编辑 `~/.codex/smart-router.toml`：
 
@@ -307,7 +315,8 @@ codex-smart-router/
 │   └── .agents/
 │       └── skills/
 │           └── smart-router/
-│               └── SKILL.md
+│               ├── SKILL.md
+│               └── scripts/token_report.py
 ├── project-template/
 │   └── AGENTS.md
 ├── fallbacks/
@@ -320,5 +329,9 @@ codex-smart-router/
     ├── install-remote.sh
     ├── install-remote.ps1
     ├── install-project.sh
-    └── install-project.ps1
+    ├── install-project.ps1
+    ├── repair-global.sh
+    └── repair_config.py
 ```
+
+每次 push 和 pull request 都会在 GitHub Actions 中执行单元测试、Shell 语法、Python 编译和 diff 格式检查。

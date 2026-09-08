@@ -16,6 +16,22 @@ from pathlib import Path
 
 
 SETTING_RE = re.compile(r"^\s*token_usage_report\s*=\s*(true|false)\s*(?:#.*)?$", re.I)
+QUOTA_BUDGET_RE = re.compile(r"^\s*quota_budget_credits\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*(?:#.*)?$", re.I)
+
+# USD and credit rates per million tokens, verified against official OpenAI
+# pricing on 2026-09-08. Cached input is included in the input count emitted by
+# Codex, so cost is computed from (input - cached), cached input, and output
+# separately. Unknown models remain explicitly unpriced instead of guessed.
+MODEL_RATES = {
+    "gpt-6-astra": {"input": 10.0, "cached": 1.0, "output": 50.0, "credits_input": 250.0,
+                     "credits_cached": 25.0, "credits_output": 1250.0},
+    "gpt-5.6-sol": {"input": 4.0, "cached": 0.4, "output": 20.0, "credits_input": 100.0,
+                      "credits_cached": 10.0, "credits_output": 500.0},
+    "gpt-5.6-terra": {"input": 2.0, "cached": 0.2, "output": 12.0, "credits_input": 50.0,
+                        "credits_cached": 5.0, "credits_output": 300.0},
+    "gpt-5.6-luna": {"input": 0.2, "cached": 0.02, "output": 1.2, "credits_input": 5.0,
+                       "credits_cached": 0.5, "credits_output": 30.0},
+}
 
 
 def is_enabled(cwd: Path, codex_home: Path) -> bool:
@@ -31,11 +47,33 @@ def is_enabled(cwd: Path, codex_home: Path) -> bool:
     return True
 
 
+def quota_budget(cwd: Path, codex_home: Path) -> float | None:
+    """Read an optional user-supplied credit budget from project then global settings."""
+    for path in (cwd / ".codex" / "smart-router.toml", codex_home / "smart-router.toml"):
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                match = QUOTA_BUDGET_RE.match(line)
+                if match:
+                    return float(match.group(1))
+        except FileNotFoundError:
+            continue
+    return None
+
+
+def session_meta(items: list[dict]) -> dict:
+    """Return agent identity stored once at the beginning of a rollout file."""
+    for item in items:
+        if item.get("type") == "session_meta" and isinstance(item.get("payload"), dict):
+            return item["payload"]
+    return {}
+
+
 def records(session_root: Path):
     for path in session_root.rglob("rollout-*.jsonl"):
         try:
             with path.open(encoding="utf-8") as handle:
-                yield path, [json.loads(line) for line in handle if line.strip()]
+                items = [json.loads(line) for line in handle if line.strip()]
+                yield path, items, session_meta(items)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
 
@@ -52,7 +90,7 @@ def context_for(items: list[dict], root_turn_id: str) -> dict | None:
 
 def newest_root_turn(session_root: Path, cwd: Path) -> str | None:
     choices = []
-    for path, items in records(session_root):
+    for path, items, _meta in records(session_root):
         for item in items:
             if item.get("type") != "turn_context":
                 continue
@@ -62,20 +100,49 @@ def newest_root_turn(session_root: Path, cwd: Path) -> str | None:
     return max(choices)[1] if choices else None
 
 
-def label(context: dict, session_id: str) -> str:
+def label(context: dict, meta: dict) -> str:
+    """Prefer the immutable session role over turn_context's optional path."""
+    role = meta.get("agent_role")
+    if role:
+        agent_path = meta.get("agent_path")
+        nickname = meta.get("agent_nickname")
+        task_name = str(agent_path).rsplit("/", 1)[-1] if agent_path else str(role)
+        suffix = f" · {role}"
+        return f"{task_name}{suffix} ({nickname})" if nickname else f"{task_name}{suffix}"
     task_path = context.get("task_path")
     if not task_path:
         return "root"
-    return str(task_path).rsplit("/", 1)[-1] or session_id[:8]
+    return str(task_path).rsplit("/", 1)[-1] or "root"
+
+
+def estimate(usage: dict, model: str) -> dict:
+    """Calculate cache rate plus API-equivalent USD and Codex credit estimates."""
+    input_tokens = int(usage.get("input_tokens", 0) or 0)
+    cached_tokens = min(int(usage.get("cached_input_tokens", 0) or 0), input_tokens)
+    output_tokens = int(usage.get("output_tokens", 0) or 0)
+    rate = MODEL_RATES.get(model)
+    result = {"cache_hit_rate": cached_tokens / input_tokens if input_tokens else 0.0}
+    if rate is None:
+        return result
+    uncached_tokens = input_tokens - cached_tokens
+    scale = 1_000_000
+    result["estimated_usd"] = (
+        uncached_tokens * rate["input"] + cached_tokens * rate["cached"] + output_tokens * rate["output"]
+    ) / scale
+    result["estimated_credits"] = (
+        uncached_tokens * rate["credits_input"] + cached_tokens * rate["credits_cached"]
+        + output_tokens * rate["credits_output"]
+    ) / scale
+    return result
 
 
 def report(session_root: Path, root_turn_id: str) -> list[dict]:
     totals: dict[tuple[str, str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for _path, items in records(session_root):
+    for _path, items, meta in records(session_root):
         context = context_for(items, root_turn_id)
         if context is None:
             continue
-        name = label(context, "")
+        name = label(context, meta)
         model = str(context.get("model") or "unknown")
         for item in items:
             if item.get("type") != "token_usage_record":
@@ -83,13 +150,13 @@ def report(session_root: Path, root_turn_id: str) -> list[dict]:
             payload = item.get("payload", {})
             if payload.get("root_turn_id") != root_turn_id:
                 continue
-            key = (name, model, str(payload.get("session_id") or "unknown"))
+            key = (name, model, str(meta.get("id") or payload.get("session_id") or "unknown"))
             for field, value in payload.get("usage", {}).items():
                 if isinstance(value, int):
                     totals[key][field] += value
     rows = []
     for (name, model, _session_id), usage in totals.items():
-        rows.append({"agent": name, "model": model, **usage})
+        rows.append({"agent": name, "model": model, **usage, **estimate(usage, model)})
     return sorted(rows, key=lambda row: (row["agent"] != "root", row["agent"], row["model"]))
 
 
@@ -113,15 +180,24 @@ def main() -> int:
         return 1
     print("#### Token usage snapshot")
     print()
-    print("| Agent | Model | Input | Cached input | Output | Total |")
-    print("| --- | --- | ---: | ---: | ---: | ---: |")
+    estimated_credits = sum(row.get("estimated_credits", 0) for row in rows)
+    budget = quota_budget(cwd, codex_home)
+    print("| Agent | Model | Input | Cached input | Cache hit | Output | Total | Est. credits | Task share | Budget quota | Est. API cost |")
+    print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
     for row in rows:
-        print("| {agent} | {model} | {input_tokens:,} | {cached_input_tokens:,} | {output_tokens:,} | {total_tokens:,} |".format(
+        credits = row.get("estimated_credits")
+        quota_share = f"{credits / estimated_credits:.1%}" if credits is not None and estimated_credits else "N/A"
+        budget_share = f"{credits / budget:.1%}" if credits is not None and budget else "N/A"
+        cost = row.get("estimated_usd")
+        print("| {agent} | {model} | {input_tokens:,} | {cached_input_tokens:,} | {cache_hit_rate:.1%} | {output_tokens:,} | {total_tokens:,} | {credits} | {quota_share} | {budget_share} | {cost} |".format(
             agent=row["agent"], model=row["model"], input_tokens=row.get("input_tokens", 0),
             cached_input_tokens=row.get("cached_input_tokens", 0), output_tokens=row.get("output_tokens", 0),
-            total_tokens=row.get("total_tokens", 0)))
+            cache_hit_rate=row["cache_hit_rate"], total_tokens=row.get("total_tokens", 0),
+            credits=f"{credits:,.2f}" if credits is not None else "N/A", quota_share=quota_share, budget_share=budget_share,
+            cost=f"${cost:,.4f}" if cost is not None else "N/A"))
     print()
-    print("Snapshot is taken before the final reply, so it excludes that reply's own model call. Cached input is included in input.")
+    print("Task share is each agent's share of estimated Codex credits for this task. Budget quota is unavailable until quota_budget_credits is configured; neither value is your live account balance.")
+    print("Estimated API cost uses bundled OpenAI reference rates verified 2026-09-08 and is not an invoice. Snapshot excludes the final reply; cached input is included in input.")
     return 0
 
 

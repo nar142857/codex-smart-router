@@ -38,11 +38,26 @@ ROOT_KEY_RE = re.compile(r"^\s*(model|model_reasoning_effort)\s*=")
 MODEL_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
+def unique_backup_path(path: Path, suffix: str = "bak") -> Path:
+    """Return a non-existing, timestamped sibling backup path.
+
+    Seconds alone are not unique: an installer can back up several files or be
+    run twice in the same second.  Keep the timestamp readable and add an
+    incrementing suffix only when necessary.
+    """
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    candidate = path.with_name(path.name + f".{suffix}-{stamp}")
+    number = 1
+    while candidate.exists():
+        candidate = path.with_name(path.name + f".{suffix}-{stamp}-{number}")
+        number += 1
+    return candidate
+
+
 def backup(path: Path):
     if not path.exists():
         return None
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    dst = path.with_name(path.name + f".bak-{stamp}")
+    dst = unique_backup_path(path)
     shutil.copy2(path, dst)
     return dst
 
@@ -228,10 +243,7 @@ def main():
     agents_dir = codex / "agents"
     skills_dir = (Path(args.skills_dir).expanduser().resolve()
                   if args.skills_dir else home / ".agents" / "skills")
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    skills_dir.mkdir(parents=True, exist_ok=True)
-
-    # Validate the config merge first so a bad merge aborts before anything is touched.
+    # Validate the config merge before creating target directories or changing files.
     cfg = codex / "config.toml"
     existing = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
     try:
@@ -239,6 +251,9 @@ def main():
     except Exception as e:
         print(f"ERROR: refusing to write {cfg}: {e}", file=sys.stderr)
         sys.exit(1)
+
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    skills_dir.mkdir(parents=True, exist_ok=True)
 
     for src in (SRC_GLOBAL / ".codex" / "agents").glob("*.toml"):
         dst = agents_dir / src.name
@@ -248,10 +263,10 @@ def main():
     src_skill = SRC_GLOBAL / ".agents" / "skills" / "smart-router"
     dst_skill = skills_dir / "smart-router"
     if dst_skill.exists():
-        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         backups_dir = skills_dir.parent / "skills-backups"
         backups_dir.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(dst_skill), str(backups_dir / f"smart-router.bak-{stamp}"))
+        skill_backup = unique_backup_path(backups_dir / "smart-router")
+        shutil.move(str(dst_skill), str(skill_backup))
     shutil.copytree(src_skill, dst_skill)
 
     settings = codex / "smart-router.toml"

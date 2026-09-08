@@ -1,0 +1,18 @@
+name: Validate Smart Router
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 -m unittest discover -v tests
+      - run: bash -n scripts/*.sh
+      - run: python3 -m py_compile scripts/install_global.py scripts/repair_config.py global/.agents/skills/smart-router/scripts/token_report.py
+      - run: git diff --check

@@ -146,6 +146,28 @@ class InstallerEndToEndTest(unittest.TestCase):
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
             self.assertIn("token_usage_report = true", (codex / "smart-router.toml").read_text(encoding="utf-8"))
 
+    def test_backup_names_do_not_collide_within_one_second(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "config.toml"
+            source.write_text("original", encoding="utf-8")
+            first = ig.backup(source)
+            second = ig.backup(source)
+            self.assertNotEqual(first, second)
+            self.assertEqual(first.read_text(encoding="utf-8"), "original")
+            self.assertEqual(second.read_text(encoding="utf-8"), "original")
+            self.assertRegex(second.name, r"config\.toml\.bak-\d{8}-\d{6}-1$")
+
+    def test_invalid_config_does_not_create_target_directories(self):
+        with tempfile.TemporaryDirectory() as home:
+            codex = Path(home) / ".codex"
+            codex.mkdir()
+            (codex / "config.toml").write_text("[agents\ninvalid", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(ROOT / "scripts" / "install_global.py"), "--home", home],
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((codex / "agents").exists())
+            self.assertFalse((Path(home) / ".agents").exists())
+
     def test_installer_keeps_skill_backups_outside_the_scanned_skills_directory(self):
         with tempfile.TemporaryDirectory() as home:
             skills = Path(home) / ".agents" / "skills" / "smart-router"
@@ -225,6 +247,13 @@ class RepairTest(unittest.TestCase):
     def test_broken_config_is_detected(self):
         self.assertFalse(rc.is_clean_backup(BROKEN_CONFIG))
         self.assertTrue(rc.is_clean_backup(USER_CONFIG))
+
+    def test_repair_recognizes_collision_safe_backup_name(self):
+        with tempfile.TemporaryDirectory() as home:
+            codex = self._home_with_broken_config(home, with_backup=False)
+            backup = codex / "config.toml.bak-20260101-000000-1"
+            backup.write_text(USER_CONFIG, encoding="utf-8")
+            self.assertEqual(rc.find_clean_backup(codex / "config.toml"), backup)
 
     def test_repair_restores_from_clean_backup(self):
         with tempfile.TemporaryDirectory() as home:
