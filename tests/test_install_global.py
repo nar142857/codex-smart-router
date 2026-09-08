@@ -145,6 +145,9 @@ class InstallerEndToEndTest(unittest.TestCase):
             assert_smart_router_merge(self, doc)
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
             self.assertIn("token_usage_report = true", (codex / "smart-router.toml").read_text(encoding="utf-8"))
+            instructions = (codex / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("actually used the `$smart-router` skill to route", instructions)
+            self.assertIn("Do not generate a token report for an ordinary single-agent task", instructions)
 
     def test_backup_names_do_not_collide_within_one_second(self):
         with tempfile.TemporaryDirectory() as tmp:

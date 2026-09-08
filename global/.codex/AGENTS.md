@@ -18,11 +18,13 @@ Routing policy:
 
 ## Task-completion token report
 
-By default, before the final reply of a task, run the installed Smart Router
-`scripts/token_report.py` and append its Markdown output unchanged. It reports
-the current root turn's token snapshot for root and every subagent that has
-logged usage. The snapshot necessarily excludes the final reply's own model
-call.
+Only when the current task actually used the `$smart-router` skill to route
+work, or spawned a subagent that logged usage, run the installed Smart Router
+`scripts/token_report.py` before the final reply and append its Markdown output
+unchanged. Do not generate a token report for an ordinary single-agent task
+that did neither. The report contains the current root turn's snapshot for
+root and every subagent that logged usage. The snapshot necessarily excludes
+the final reply's own model call.
 
 Users can disable this per project with `.codex/smart-router.toml`, or globally
 with `~/.codex/smart-router.toml`:
