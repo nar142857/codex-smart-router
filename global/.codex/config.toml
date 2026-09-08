@@ -1,10 +1,7 @@
-# Codex Smart Router — Terra-default profile
-# Root/orchestrator: GPT-5.6 Terra Medium
+# Codex Smart Router — user-selected Root profile
+# Root/orchestrator: the model selected for the current Codex conversation
 # Cheap/default subagents: GPT-5.6 Luna
 # If Terra is temporarily unavailable, use the Sol fallback in /fallbacks.
-
-model = "gpt-5.6-terra"
-model_reasoning_effort = "medium"
 
 [agents]
 enabled = true

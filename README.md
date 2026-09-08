@@ -1,11 +1,11 @@
-# Codex Smart Router v2 — Terra / Luna / Sol / Astra
+# Codex Smart Router v3 — user-selected Root
 
 一套可直接复制/安装到 Codex 的多 Agent 路由配置，目标是：**尽量保持复杂任务质量，同时减少高价模型的无效 token 消耗。**
 
 ## 默认拓扑
 
 ```text
-             GPT-5.6 Terra Medium root
+       Current Codex conversation model root
              plan / decide / integrate
                       |
         +-------------+-------------+
@@ -26,7 +26,8 @@
 
 - 小任务：root 直接做，不机械启动 subagents。
 - Luna：搜索、读代码、研究、测试、非常明确的低风险小改动。
-- Terra Medium：默认 Root / Orchestrator，并承担常规 feature / refactor / bugfix。
+- Root：用户在 Codex 对话框模型选择器中选什么模型，该对话就用什么模型做 Root / Orchestrator；Smart Router 不会覆盖它。
+- Terra：承担常规 feature / refactor / bugfix；若用户在对话框选择 Terra，它同时就是该对话的 Root。
 - Sol：困难 Bug、算法、并发、性能、复杂集成、独立 Review。
 - Astra：只用于认证授权、安全边界、支付、破坏性迁移或极复杂架构等高风险场景的 `deep_reviewer`；不得用于日常搜索、实现、测试、总结或普通 Review。
 - 默认最多 4 个 subagent 并发。
@@ -38,7 +39,7 @@
 - GPT-5.6 在 Codex 至少需要较新的 0.144.x 以上版本。
 - GPT-6 Astra 仅在实际需要深度复核时才会被调用，且可能仍处于账户逐步开放阶段。
 
-默认安装使用 Terra Root；如 Terra 临时不可用，可切换为 Sol fallback，其他角色映射不变。
+安装器不会设置或替换 `model`、`model_reasoning_effort`。请直接在 Codex 对话框选择 Root 模型；新对话和当前对话都可独立选择。
 
 ---
 
@@ -53,13 +54,7 @@
 ```bash
 cd codex-smart-router
 chmod +x scripts/install-global.sh
-./scripts/install-global.sh terra
-```
-
-如 Terra 临时不可用：
-
-```bash
-./scripts/install-global.sh sol
+./scripts/install-global.sh
 ```
 
 安装器会：
@@ -67,7 +62,7 @@ chmod +x scripts/install-global.sh
 - 安装角色到 `~/.codex/agents/`
 - 安装 Skill 到 `~/.agents/skills/smart-router/`
 - 合并路由规则到 `~/.codex/AGENTS.md`
-- 合并 `~/.codex/config.toml` 中的 root model、`[agents]` 设置及 8 个角色注册
+- 合并 `~/.codex/config.toml` 中的 `[agents]` 设置及 8 个角色注册；不写入 Root 模型
 - 保留你其他 config section，例如 MCP server / provider / permissions
 - 项目级安装同样采用备份、合并和 TOML 校验，不覆盖项目已有的顶层配置或 AGENTS 规则
 - 修改已有文件前自动生成 `.bak-时间戳` 备份
@@ -76,13 +71,7 @@ chmod +x scripts/install-global.sh
 
 ```powershell
 cd codex-smart-router
-powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root terra
-```
-
-Terra 临时不可用：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root sol
+powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1
 ```
 
 安装完成后**完全退出并重启 Codex App / CLI**。
@@ -98,19 +87,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -Root sol
 ## macOS / Linux
 
 ```bash
-./scripts/install-project.sh /path/to/your/repo terra
-```
-
-Terra 临时不可用：
-
-```bash
-./scripts/install-project.sh /path/to/your/repo sol
+./scripts/install-project.sh /path/to/your/repo
 ```
 
 ## Windows PowerShell
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-project.ps1 -Target "D:\Projects\MyApp" -Root terra
+powershell -ExecutionPolicy Bypass -File .\scripts\install-project.ps1 -Target "D:\Projects\MyApp"
 ```
 
 项目最终会包含：
@@ -142,6 +125,7 @@ repo/
 全局规则会要求 Codex：
 
 ```text
+当前对话选中模型 -> Root / 规划 / 决策 / 整合
 简单任务 -> 不分流
 常规实现 -> Terra
 搜索/测试 -> Luna
@@ -205,30 +189,9 @@ $smart-router
 
 ---
 
-# Terra 临时不可用
+# Root 模型选择
 
-使用：
-
-```text
-fallbacks/config-root-sol.toml
-```
-
-或者重新运行：
-
-```bash
-./scripts/install-global.sh sol
-```
-
-这会变成：
-
-```text
-Sol fallback root
-  -> Luna search/test
-  -> Terra normal implementation
-  -> Sol hard work/review
-```
-
-依然可以正常工作；Astra 始终只保留给极高风险的 deep review。
+在 Codex 对话框的模型选择器中选择模型，即可决定该对话的 Root。模型选择只影响 Root；Smart Router 的子代理映射保持不变：Luna 用于探索/研究/测试，Terra 用于常规实现，Sol 用于困难任务和重要 Review，Astra 仅用于极高风险 deep review。
 
 ---
 

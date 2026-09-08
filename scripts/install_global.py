@@ -16,7 +16,6 @@ SRC_GLOBAL = BUNDLE / "global"
 
 MANAGED_START = "# --- Smart Router managed block ---"
 MANAGED_END = "# --- End Smart Router managed block ---"
-MANAGED_TOP_KEYS = ("model", "model_reasoning_effort")
 MANAGED_AGENTS = {
     "enabled": True,
     "max_concurrent_threads_per_session": 4,
@@ -35,7 +34,6 @@ MANAGED_AGENT_ROLE_CONFIGS = {
 }
 
 SECTION_RE = re.compile(r"^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$")
-TOP_KEY_RE = re.compile(r"^\s*(model|model_reasoning_effort)\s*=")
 
 
 def backup(path: Path):
@@ -47,10 +45,6 @@ def backup(path: Path):
     return dst
 
 
-def root_model_for(root: str) -> str:
-    return "gpt-5.6-terra" if root == "terra" else "gpt-5.6-sol"
-
-
 def parse_toml(text: str):
     """Return the parsed TOML document, or raise if no parser is available."""
     if _toml is None:
@@ -58,13 +52,9 @@ def parse_toml(text: str):
     return _toml.loads(text)
 
 
-def managed_block(root_model: str) -> str:
-    effort = "medium"
+def managed_block() -> str:
     lines = [
         MANAGED_START,
-        f'model = "{root_model}"',
-        f'model_reasoning_effort = "{effort}"',
-        "",
         "[agents]",
     ]
     for k, v in MANAGED_AGENTS.items():
@@ -88,13 +78,13 @@ def _strip_blank_edges(lines):
     return lines
 
 
-def merge_config(existing: str, root_model: str) -> str:
+def merge_config(existing: str) -> str:
     """Merge the Smart Router settings into an existing Codex config.toml.
 
     Layout of the result:
       1. the user's original top-level keys (everything before the first table),
-         minus the Smart Router managed keys `model` / `model_reasoning_effort`
-      2. the Smart Router managed block (root model + `[agents]` table)
+         including their selected/default root model settings
+      2. the Smart Router managed block (`[agents]` table only)
       3. every other table from the original file, in original order
 
     The bare `[agents]` table and the eight Smart Router role-registration
@@ -119,8 +109,6 @@ def merge_config(existing: str, root_model: str) -> str:
                 rest.append(line)
             continue
         if section is None:
-            if TOP_KEY_RE.match(line):
-                continue
             top.append(line)
             continue
         if skip_agents_body:
@@ -133,7 +121,7 @@ def merge_config(existing: str, root_model: str) -> str:
     parts = []
     if top:
         parts.append("\n".join(top))
-    parts.append(managed_block(root_model))
+    parts.append(managed_block())
     if rest:
         parts.append("\n".join(rest))
     return "\n\n".join(parts) + "\n"
@@ -143,7 +131,7 @@ def merge_config(existing: str, root_model: str) -> str:
 replace_top_level_and_agents = merge_config
 
 
-def validate_merged(existing: str, merged: str, root_model: str) -> dict:
+def validate_merged(existing: str, merged: str) -> dict:
     """Parse the merged config and check that nothing the user had was lost."""
     doc = parse_toml(merged)
 
@@ -153,9 +141,6 @@ def validate_merged(existing: str, merged: str, root_model: str) -> dict:
     for k, v in MANAGED_AGENTS.items():
         if agents.get(k) != v:
             raise ValueError(f"merged config: agents.{k} = {agents.get(k)!r}, expected {v!r}")
-    if doc.get("model") != root_model:
-        raise ValueError(f"merged config: model = {doc.get('model')!r}, expected {root_model!r}")
-
     try:
         original = parse_toml(existing) if existing.strip() else {}
     except Exception:
@@ -164,8 +149,6 @@ def validate_merged(existing: str, merged: str, root_model: str) -> dict:
         return doc
 
     for key, value in original.items():
-        if key in MANAGED_TOP_KEYS:
-            continue
         if key == "agents":
             # user sub-tables under agents must survive, scalar keys are managed
             for sub_k, sub_v in value.items() if isinstance(value, dict) else []:
@@ -186,9 +169,9 @@ def validate_merged(existing: str, merged: str, root_model: str) -> dict:
     return doc
 
 
-def merge_and_validate(existing: str, root_model: str) -> str:
-    merged = merge_config(existing, root_model)
-    validate_merged(existing, merged, root_model)
+def merge_and_validate(existing: str) -> str:
+    merged = merge_config(existing)
+    validate_merged(existing, merged)
     return merged
 
 
@@ -206,8 +189,6 @@ def merge_agents_md(existing: str, block: str) -> str:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--root", choices=["terra", "sol"], default="terra",
-                   help="root model profile; Terra is the default, Sol is an emergency fallback")
     p.add_argument("--home", default=str(Path.home()))
     p.add_argument("--codex-dir", help="override the Codex directory; enables safe project-scoped installation")
     p.add_argument("--skills-dir", help="override the skills directory; defaults to <home>/.agents/skills")
@@ -225,9 +206,8 @@ def main():
     # Validate the config merge first so a bad merge aborts before anything is touched.
     cfg = codex / "config.toml"
     existing = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
-    root_model = root_model_for(args.root)
     try:
-        merged = merge_and_validate(existing, root_model)
+        merged = merge_and_validate(existing)
     except Exception as e:
         print(f"ERROR: refusing to write {cfg}: {e}", file=sys.stderr)
         sys.exit(1)
@@ -255,7 +235,7 @@ def main():
     global_agents.write_text(merge_agents_md(existing_agents, block), encoding="utf-8")
 
     print("Installed Codex Smart Router")
-    print(f"Root model: {root_model}")
+    print("Root model: inherited from the Codex conversation model picker")
     print(f"Config: {cfg}")
     print(f"Agents: {agents_dir}")
     print(f"Skill: {dst_skill}")

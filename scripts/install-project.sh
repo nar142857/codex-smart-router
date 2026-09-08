@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 TARGET="${1:-.}"
-ROOT="${2:-terra}"
+if [[ "$#" -gt 1 ]]; then
+  echo "Usage: ./install-project.sh [target]"
+  exit 2
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$(cd "$TARGET" && pwd)"
 if command -v python3 >/dev/null 2>&1; then
@@ -12,4 +15,4 @@ else
   echo "Python 3 is required for the safe merge installer."
   exit 1
 fi
-"$PYTHON" "$SCRIPT_DIR/install_global.py" --root "$ROOT" --codex-dir "$TARGET/.codex" --skills-dir "$TARGET/.agents/skills" --agents-md "$TARGET/AGENTS.md"
+"$PYTHON" "$SCRIPT_DIR/install_global.py" --codex-dir "$TARGET/.codex" --skills-dir "$TARGET/.agents/skills" --agents-md "$TARGET/AGENTS.md"

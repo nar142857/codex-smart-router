@@ -20,7 +20,7 @@ import argparse, datetime, re, shutil, sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from install_global import (  # noqa: E402
-    MANAGED_AGENTS, MANAGED_START, SECTION_RE, merge_and_validate, parse_toml, root_model_for,
+    MANAGED_AGENTS, MANAGED_START, SECTION_RE, merge_and_validate, parse_toml,
 )
 
 # Only backups written by the installer itself (config.toml.bak-YYYYMMDD-HHMMSS).
@@ -82,17 +82,8 @@ def hoist_misplaced_agents_keys(text: str) -> str:
     return "\n".join(top + hoisted + [""] + rest) + "\n"
 
 
-def detect_root(text: str) -> str:
-    m = re.search(r'^\s*model\s*=\s*"([^"]+)"', text, re.M)
-    if m and m.group(1) == "gpt-5.6-sol":
-        return "sol"
-    return "terra"
-
-
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", choices=["terra", "sol", "auto"], default="auto",
-                   help="root model; 'auto' keeps whatever the current config uses (default)")
     p.add_argument("--home", default=str(Path.home()))
     p.add_argument("--backup", help="explicit clean backup to restore from (skips auto detection)")
     p.add_argument("--dry-run", action="store_true", help="print the repaired config instead of writing it")
@@ -105,9 +96,6 @@ def main():
         return 1
 
     current = cfg.read_text(encoding="utf-8")
-    root = detect_root(current) if args.root == "auto" else args.root
-    root_model = root_model_for(root)
-
     if args.backup:
         source = Path(args.backup).expanduser().resolve()
         if not source.exists():
@@ -125,7 +113,7 @@ def main():
         base = hoist_misplaced_agents_keys(current)
 
     try:
-        merged = merge_and_validate(base, root_model)
+        merged = merge_and_validate(base)
     except Exception as e:
         print(f"ERROR: repaired config failed validation, nothing written: {e}", file=sys.stderr)
         return 1
@@ -141,7 +129,7 @@ def main():
 
     print(f"Backed up broken config to: {broken}")
     print(f"Repaired config written to: {cfg}")
-    print(f"Root model: {root_model}")
+    print("Root model: preserved; each Codex conversation uses its selected model as Root.")
     print("Restart Codex after repairing.")
     return 0
 

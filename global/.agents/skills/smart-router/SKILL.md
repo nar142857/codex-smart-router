@@ -5,7 +5,7 @@ description: Route Codex software-engineering work across Astra, Sol, Terra, and
 
 # Smart Router
 
-Default root/orchestrator: Terra Medium. Optimize for correct results while minimizing Plus-plan allowance consumption.
+Root/orchestrator: the model selected for the current Codex conversation. The skill never overrides that selection. Optimize for correct results while minimizing Plus-plan allowance consumption.
 
 ## Core principle
 
@@ -19,13 +19,13 @@ Use the cheapest capable agent for each bounded task:
 - `reviewer` (Sol): independent review for substantial or risky changes.
 - `deep_reviewer` (Astra): only for very high-risk or costly-to-fail changes.
 
-Terra Root handles small/local tasks directly; do not start a subagent unless delegation materially improves the result. Astra is never the default Root and must not be used for routine repository exploration, ordinary implementation, ordinary testing, summarization, or standard review.
+The current conversation Root handles small/local tasks directly; do not start a subagent unless delegation materially improves the result. Astra must not be selected for routine repository exploration, ordinary implementation, ordinary testing, summarization, or standard review; reserve it for exceptional high-risk deep review.
 
 ## Step 1 — classify by uncertainty + blast radius
 
 ### S — trivial/local
 Signs: one obvious file/tiny edit, established pattern, low blast radius, no architecture/schema/public-API/security implications.
-Action: Terra Root handles directly, or `fast_worker` only if delegation clearly saves context. No mandatory explorer/reviewer.
+Action: the current conversation Root handles directly, or `fast_worker` only if delegation clearly saves context. No mandatory explorer/reviewer.
 
 ### M — normal engineering
 Signs: bounded feature/bug, a few related files, architecture is clear, moderate contained risk.
@@ -33,11 +33,11 @@ Action: use Luna (`explorer`/`researcher`) for unknown locations, call chains, r
 
 ### L — complex/cross-cutting
 Signs: multiple subsystems, unclear root cause, significant refactor/integration, public API/schema/compatibility implications, several independent workstreams.
-Action: parallel Luna `explorer`/`researcher` only for independent discovery; Terra Root decides architecture; Terra `worker` for normal slices; Sol `expert` only for genuinely hard slices; Luna `tester`; finish with Sol `reviewer` only when the risk warrants it.
+Action: parallel Luna `explorer`/`researcher` only for independent discovery; the current conversation Root decides architecture; Terra `worker` for normal slices; Sol `expert` only for genuinely hard slices; Luna `tester`; finish with Sol `reviewer` only when the risk warrants it.
 
 ### XL — high-risk
 Signs: auth/authorization/security boundary, payments/billing, destructive migration, irreversible data operation, concurrency correctness, major public API/architecture change, costly production failure.
-Action: Terra Root owns architecture; Sol `expert` for difficult implementation; Luna `tester`; Sol `reviewer`; Astra `deep_reviewer` only when an independent high-risk pass is worth the allowance.
+Action: the current conversation Root owns architecture; Sol `expert` for difficult implementation; Luna `tester`; Sol `reviewer`; Astra `deep_reviewer` only when an independent high-risk pass is worth the allowance.
 
 ## Step 2 — parallelism
 Parallelize only independent work. Good: backend discovery + frontend discovery; docs research + repo exploration; workers on non-overlapping files. Avoid two workers editing the same contract/file. Do not spawn roles mechanically. Target 2–4 active subagents by default.

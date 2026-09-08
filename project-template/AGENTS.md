@@ -23,7 +23,7 @@
 ## Multi-agent routing
 Use `$smart-router` for non-trivial work.
 - Luna: exploration/research/tests/obvious low-risk edits.
-- Terra Medium: default root/orchestrator and normal implementation.
+- Root/orchestrator: the model selected for the current Codex conversation; Terra handles normal implementation.
 - Sol: hard debugging, architecture-sensitive logic, algorithms/concurrency/performance, substantial review.
 - Astra: exceptional high-risk deep review only; never use it for routine exploration, implementation, testing, summaries, or ordinary review.
 

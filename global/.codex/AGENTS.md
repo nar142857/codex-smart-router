@@ -3,10 +3,10 @@
 For software-engineering work, use the `$smart-router` skill whenever decomposition or model routing can materially improve quality or reduce expensive-model usage.
 
 Routing policy:
-- Default root/orchestrator: GPT-5.6 Terra Medium.
+- Root/orchestrator: use the model selected for the current Codex conversation.
 - Keep trivial/local tasks single-agent.
 - Luna: exploration, repository search, reading, research, tests, and low-risk bounded tasks.
-- Terra: default implementation and orchestration.
+- Terra: normal implementation; it is also Root when selected in the conversation model picker.
 - Escalate only difficult reasoning/implementation to Sol.
 - Sol: difficult debugging, algorithms, concurrency, performance, architecture-sensitive work, and important review.
 - Astra: exceptional high-risk deep review only.
