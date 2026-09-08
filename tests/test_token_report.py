@@ -68,6 +68,5 @@ class TokenReportTest(unittest.TestCase):
             (project / ".codex" / "smart-router.toml").write_text("quota_budget_credits = 25\n", encoding="utf-8")
             self.assertEqual(token_report.quota_budget(project, home / ".codex"), 25.0)
 
-
 if __name__ == "__main__":
     unittest.main()

@@ -182,7 +182,7 @@ def main() -> int:
     print()
     estimated_credits = sum(row.get("estimated_credits", 0) for row in rows)
     budget = quota_budget(cwd, codex_home)
-    print("| Agent | Model | Input | Cached input | Cache hit | Output | Total | Est. credits | Task share | Budget quota | Est. API cost |")
+    print("| Agent | Model | 输入 | 缓存输入 | 缓存命中率 | 输出 | 总计 | 估算 Credits | 任务占比 | 预算占比 | 估算 API 费用 |")
     print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
     for row in rows:
         credits = row.get("estimated_credits")
@@ -196,8 +196,8 @@ def main() -> int:
             credits=f"{credits:,.2f}" if credits is not None else "N/A", quota_share=quota_share, budget_share=budget_share,
             cost=f"${cost:,.4f}" if cost is not None else "N/A"))
     print()
-    print("Task share is each agent's share of estimated Codex credits for this task. Budget quota is unavailable until quota_budget_credits is configured; neither value is your live account balance.")
-    print("Estimated API cost uses bundled OpenAI reference rates verified 2026-09-08 and is not an invoice. Snapshot excludes the final reply; cached input is included in input.")
+    print("任务占比表示各 Agent 占本任务估算 Codex Credits 的比例。未配置 quota_budget_credits 时，预算占比显示 N/A；两者都不是账户实时余额。")
+    print("估算 API 费用使用包内 2026-09-08 核验的 OpenAI 参考费率，仅供比较，不构成账单。快照不含最终回复本身；缓存输入已计入输入。")
     return 0
 
 
