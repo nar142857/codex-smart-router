@@ -138,6 +138,21 @@ class InstallerEndToEndTest(unittest.TestCase):
             assert_smart_router_merge(self, doc)
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
 
+
+class RemoteBootstrapTest(unittest.TestCase):
+    def test_bootstrap_scripts_download_to_temp_and_invoke_global_installer(self):
+        shell = (ROOT / "scripts" / "install-remote.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "scripts" / "install-remote.ps1").read_text(encoding="utf-8")
+        self.assertIn("mktemp -d", shell)
+        self.assertIn("https://github.com/$REPO/archive/$REF.tar.gz", shell)
+        self.assertIn('bash "$BUNDLE_DIR/scripts/install-global.sh"', shell)
+        self.assertIn("trap 'rm -rf", shell)
+        self.assertNotIn("git clone", shell)
+        self.assertIn("https://github.com/$Repo/archive/$Ref.zip", powershell)
+        self.assertIn("install-global.ps1", powershell)
+        self.assertIn("Remove-Item -Path $TempDir -Recurse -Force", powershell)
+        self.assertNotIn("git clone", powershell)
+
     def test_project_scoped_install_preserves_existing_config_and_instructions(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

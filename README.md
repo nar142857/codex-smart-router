@@ -47,6 +47,24 @@
 
 一次安装后，所有 Codex 项目都可以使用。
 
+## 一条命令安装（无需 clone 或保留项目目录）
+
+安装器会将 GitHub 归档下载到临时目录，执行全局安装后自动删除临时文件。
+
+### macOS / Linux
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/install-remote.sh | bash
+```
+
+### Windows PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/install-remote.ps1 | iex
+```
+
+如需固定某个已审阅的 tag、分支或 commit，可先下载引导脚本后传入 `--ref`（macOS / Linux），或保存脚本后使用 `-Ref`（PowerShell）。默认使用 `main` 的最新版本。
+
 ## macOS / Linux
 
 解压后进入目录：
@@ -109,6 +127,8 @@ repo/
 │           └── SKILL.md
 └── AGENTS.md
 ```
+
+远程引导安装只支持全局安装；项目级安装仍需传入目标项目路径。
 
 ---
 
@@ -255,6 +275,8 @@ codex-smart-router/
     ├── install_global.py
     ├── install-global.sh
     ├── install-global.ps1
+    ├── install-remote.sh
+    ├── install-remote.ps1
     ├── install-project.sh
     └── install-project.ps1
 ```
