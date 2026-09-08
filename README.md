@@ -39,7 +39,9 @@
 - GPT-5.6 在 Codex 至少需要较新的 0.144.x 以上版本。
 - GPT-6 Astra 仅在实际需要深度复核时才会被调用，且可能仍处于账户逐步开放阶段。
 
-安装器不会设置或替换 `model`、`model_reasoning_effort`。请直接在 Codex 对话框选择 Root 模型；新对话和当前对话都可独立选择。
+默认情况下，安装器不会设置或替换 `model`、`model_reasoning_effort`。请直接在 Codex 对话框选择 Root 模型；新对话和当前对话都可独立选择。
+
+如果希望给“未在对话框显式选择模型”的新对话设置默认值，可在安装时传入 `--default-model`。这是默认值，不会覆盖用户在对话框中的选择；对话框选择始终优先。
 
 ---
 
@@ -65,6 +67,27 @@ irm https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/
 
 如需固定某个已审阅的 tag、分支或 commit，可先下载引导脚本后传入 `--ref`（macOS / Linux），或保存脚本后使用 `-Ref`（PowerShell）。默认使用 `main` 的最新版本。
 
+## 可选：设置默认 Root 模型
+
+以下命令只设置 Codex 的默认模型。用户在对话框模型选择器中选择的模型始终优先，并成为当前对话的 Root。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/install-remote.sh | bash -s -- --default-model gpt-5.6-terra
+```
+
+默认推理强度为 `medium`；需要时可明确指定：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/install-remote.sh | bash -s -- --default-model gpt-5.6-sol --default-reasoning-effort high
+```
+
+PowerShell（先保存引导脚本再传入参数）：
+
+```powershell
+irm https://raw.githubusercontent.com/nar142857/codex-smart-router/main/scripts/install-remote.ps1 -OutFile install-remote.ps1
+.\install-remote.ps1 -DefaultModel gpt-5.6-terra
+```
+
 ## macOS / Linux
 
 解压后进入目录：
@@ -74,6 +97,8 @@ cd codex-smart-router
 chmod +x scripts/install-global.sh
 ./scripts/install-global.sh
 ```
+
+可选默认模型：`./scripts/install-global.sh --default-model gpt-5.6-terra`。
 
 安装器会：
 
@@ -91,6 +116,8 @@ chmod +x scripts/install-global.sh
 cd codex-smart-router
 powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1
 ```
+
+可选默认模型：`powershell -ExecutionPolicy Bypass -File .\scripts\install-global.ps1 -DefaultModel gpt-5.6-terra`。
 
 安装完成后**完全退出并重启 Codex App / CLI**。
 

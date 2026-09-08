@@ -34,6 +34,8 @@ MANAGED_AGENT_ROLE_CONFIGS = {
 }
 
 SECTION_RE = re.compile(r"^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$")
+ROOT_KEY_RE = re.compile(r"^\s*(model|model_reasoning_effort)\s*=")
+MODEL_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 def backup(path: Path):
@@ -78,12 +80,14 @@ def _strip_blank_edges(lines):
     return lines
 
 
-def merge_config(existing: str) -> str:
+def merge_config(existing: str, default_model: str | None = None,
+                 default_reasoning_effort: str | None = None) -> str:
     """Merge the Smart Router settings into an existing Codex config.toml.
 
     Layout of the result:
       1. the user's original top-level keys (everything before the first table),
-         including their selected/default root model settings
+         including their selected/default root model settings unless an explicit
+         `default_model` override was requested
       2. the Smart Router managed block (`[agents]` table only)
       3. every other table from the original file, in original order
 
@@ -109,6 +113,8 @@ def merge_config(existing: str) -> str:
                 rest.append(line)
             continue
         if section is None:
+            if default_model is not None and ROOT_KEY_RE.match(line):
+                continue
             top.append(line)
             continue
         if skip_agents_body:
@@ -119,6 +125,11 @@ def merge_config(existing: str) -> str:
     rest = _strip_blank_edges(rest)
 
     parts = []
+    if default_model is not None:
+        parts.append("\n".join([
+            f'model = "{default_model}"',
+            f'model_reasoning_effort = "{default_reasoning_effort}"',
+        ]))
     if top:
         parts.append("\n".join(top))
     parts.append(managed_block())
@@ -131,7 +142,8 @@ def merge_config(existing: str) -> str:
 replace_top_level_and_agents = merge_config
 
 
-def validate_merged(existing: str, merged: str) -> dict:
+def validate_merged(existing: str, merged: str, default_model: str | None = None,
+                    default_reasoning_effort: str | None = None) -> dict:
     """Parse the merged config and check that nothing the user had was lost."""
     doc = parse_toml(merged)
 
@@ -141,6 +153,11 @@ def validate_merged(existing: str, merged: str) -> dict:
     for k, v in MANAGED_AGENTS.items():
         if agents.get(k) != v:
             raise ValueError(f"merged config: agents.{k} = {agents.get(k)!r}, expected {v!r}")
+    if default_model is not None:
+        if doc.get("model") != default_model:
+            raise ValueError(f"merged config: model = {doc.get('model')!r}, expected {default_model!r}")
+        if doc.get("model_reasoning_effort") != default_reasoning_effort:
+            raise ValueError("merged config did not set the requested default reasoning effort")
     try:
         original = parse_toml(existing) if existing.strip() else {}
     except Exception:
@@ -149,6 +166,8 @@ def validate_merged(existing: str, merged: str) -> dict:
         return doc
 
     for key, value in original.items():
+        if default_model is not None and key in {"model", "model_reasoning_effort"}:
+            continue
         if key == "agents":
             # user sub-tables under agents must survive, scalar keys are managed
             for sub_k, sub_v in value.items() if isinstance(value, dict) else []:
@@ -169,9 +188,10 @@ def validate_merged(existing: str, merged: str) -> dict:
     return doc
 
 
-def merge_and_validate(existing: str) -> str:
-    merged = merge_config(existing)
-    validate_merged(existing, merged)
+def merge_and_validate(existing: str, default_model: str | None = None,
+                       default_reasoning_effort: str | None = None) -> str:
+    merged = merge_config(existing, default_model, default_reasoning_effort)
+    validate_merged(existing, merged, default_model, default_reasoning_effort)
     return merged
 
 
@@ -189,11 +209,19 @@ def merge_agents_md(existing: str, block: str) -> str:
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument("--default-model", help="optional global default model; the conversation model picker still wins")
+    p.add_argument("--default-reasoning-effort", choices=["low", "medium", "high", "xhigh", "max", "ultra"],
+                   help="optional default reasoning effort; defaults to medium when --default-model is set")
     p.add_argument("--home", default=str(Path.home()))
     p.add_argument("--codex-dir", help="override the Codex directory; enables safe project-scoped installation")
     p.add_argument("--skills-dir", help="override the skills directory; defaults to <home>/.agents/skills")
     p.add_argument("--agents-md", help="override the AGENTS.md path; defaults to <codex-dir>/AGENTS.md")
     args = p.parse_args()
+    if args.default_reasoning_effort and not args.default_model:
+        p.error("--default-reasoning-effort requires --default-model")
+    if args.default_model and not MODEL_RE.fullmatch(args.default_model):
+        p.error("--default-model must contain only letters, numbers, dots, underscores, colons, or hyphens")
+    default_effort = "medium" if args.default_model and not args.default_reasoning_effort else args.default_reasoning_effort
 
     home = Path(args.home).expanduser().resolve()
     codex = Path(args.codex_dir).expanduser().resolve() if args.codex_dir else home / ".codex"
@@ -207,7 +235,7 @@ def main():
     cfg = codex / "config.toml"
     existing = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
     try:
-        merged = merge_and_validate(existing)
+        merged = merge_and_validate(existing, args.default_model, default_effort)
     except Exception as e:
         print(f"ERROR: refusing to write {cfg}: {e}", file=sys.stderr)
         sys.exit(1)
@@ -235,7 +263,10 @@ def main():
     global_agents.write_text(merge_agents_md(existing_agents, block), encoding="utf-8")
 
     print("Installed Codex Smart Router")
-    print("Root model: inherited from the Codex conversation model picker")
+    if args.default_model:
+        print(f"Default model: {args.default_model} / {default_effort} (conversation model picker has priority)")
+    else:
+        print("Root model: inherited from the Codex conversation model picker")
     print(f"Config: {cfg}")
     print(f"Agents: {agents_dir}")
     print(f"Skill: {dst_skill}")

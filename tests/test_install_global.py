@@ -81,6 +81,13 @@ class MergeConfigTest(unittest.TestCase):
         self.assertEqual(doc["model_reasoning_effort"], "high")
         assert_smart_router_merge(self, doc)
 
+    def test_requested_default_model_replaces_only_default_settings(self):
+        existing = 'model = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n\n' + USER_CONFIG
+        doc = tomllib.loads(ig.merge_and_validate(existing, "gpt-5.6-terra", "medium"))
+        self.assertEqual(doc["model"], "gpt-5.6-terra")
+        self.assertEqual(doc["model_reasoning_effort"], "medium")
+        assert_smart_router_merge(self, doc)
+
     def test_empty_config(self):
         doc = tomllib.loads(ig.merge_and_validate(""))
         self.assertIs(doc["agents"]["enabled"], True)
@@ -138,6 +145,19 @@ class InstallerEndToEndTest(unittest.TestCase):
             assert_smart_router_merge(self, doc)
             self.assertTrue(list(codex.glob("config.toml.bak-*")))
 
+    def test_install_can_set_an_optional_default_model(self):
+        with tempfile.TemporaryDirectory() as home:
+            codex = Path(home) / ".codex"
+            codex.mkdir()
+            (codex / "config.toml").write_text(USER_CONFIG, encoding="utf-8")
+            subprocess.run([sys.executable, str(ROOT / "scripts" / "install_global.py"),
+                            "--home", home, "--default-model", "gpt-5.6-terra"],
+                           check=True, capture_output=True)
+            doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
+            self.assertEqual(doc["model"], "gpt-5.6-terra")
+            self.assertEqual(doc["model_reasoning_effort"], "medium")
+            assert_smart_router_merge(self, doc)
+
 
 class RemoteBootstrapTest(unittest.TestCase):
     def test_bootstrap_scripts_download_to_temp_and_invoke_global_installer(self):
@@ -147,10 +167,12 @@ class RemoteBootstrapTest(unittest.TestCase):
         self.assertIn("https://github.com/$REPO/archive/$REF.tar.gz", shell)
         self.assertIn('bash "$BUNDLE_DIR/scripts/install-global.sh"', shell)
         self.assertIn("trap 'rm -rf", shell)
+        self.assertIn("--default-model|--default-reasoning-effort", shell)
         self.assertNotIn("git clone", shell)
         self.assertIn("https://github.com/$Repo/archive/$Ref.zip", powershell)
         self.assertIn("install-global.ps1", powershell)
         self.assertIn("Remove-Item -Path $TempDir -Recurse -Force", powershell)
+        self.assertIn("[string]$DefaultModel", powershell)
         self.assertNotIn("git clone", powershell)
 
     def test_project_scoped_install_preserves_existing_config_and_instructions(self):

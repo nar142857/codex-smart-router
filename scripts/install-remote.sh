@@ -4,6 +4,7 @@ set -euo pipefail
 
 REPO="${CODEX_SMART_ROUTER_REPO:-nar142857/codex-smart-router}"
 REF="${CODEX_SMART_ROUTER_REF:-main}"
+INSTALL_ARGS=()
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -17,8 +18,13 @@ while [[ "$#" -gt 0 ]]; do
       REPO="$2"
       shift 2
       ;;
+    --default-model|--default-reasoning-effort)
+      [[ "$#" -ge 2 ]] || { echo "$1 requires a value" >&2; exit 2; }
+      INSTALL_ARGS+=("$1" "$2")
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: install-remote.sh [--ref branch|tag|commit] [--repo owner/name]"
+      echo "Usage: install-remote.sh [--ref branch|tag|commit] [--repo owner/name] [--default-model model] [--default-reasoning-effort effort]"
       exit 0
       ;;
     *)
@@ -47,5 +53,5 @@ BUNDLE_DIR="$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d -print -quit)"
   exit 1
 }
 
-bash "$BUNDLE_DIR/scripts/install-global.sh"
+bash "$BUNDLE_DIR/scripts/install-global.sh" "${INSTALL_ARGS[@]}"
 echo "Temporary installer files removed. Restart Codex to load the new global routing rules."
