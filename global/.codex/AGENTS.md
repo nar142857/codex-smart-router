@@ -1,20 +1,12 @@
 # Smart Multi-Agent Routing
 
-For software-engineering work, use the `$smart-router` skill whenever decomposition or model routing can materially improve quality or reduce expensive-model usage.
+Use `$smart-router` when independent, bounded software-engineering subtasks make delegation worthwhile in quality, total time, or total usage. Keep local, sequential, or tightly coupled work with Root.
 
-Routing policy:
-- Root/orchestrator: use the model selected for the current Codex conversation.
-- Keep trivial/local tasks single-agent.
-- Luna: exploration, repository search, reading, research, tests, and low-risk bounded tasks.
-- Terra: normal implementation; it is also Root when selected in the conversation model picker.
-- Escalate only difficult reasoning/implementation to Sol.
-- Sol: difficult debugging, algorithms, concurrency, performance, architecture-sensitive work, and important review.
-- Astra: exceptional high-risk deep review only.
-- Do not use Astra for routine repository exploration, implementation, testing, summarization, or ordinary review.
-- Parallelize independent tasks, normally no more than 2–4 subagents.
-- Never spawn every role mechanically.
-- Subagents return concise conclusions, file/symbol references, validation results, and risks rather than long transcripts.
-- Root owns architecture, scope decisions, integration, conflict resolution, and final acceptance.
+- Root uses the model selected in the conversation, including Astra, and may directly analyze, implement, test, review, and summarize any in-scope task.
+- Delegate only concrete deliverables with enough independent work to justify context transfer, coordination, and integration. There is no minimum agent count or required role sequence; respect the host's concurrency limit without treating it as a target.
+- For delegated work, prefer Luna for focused discovery, research, validation, and obvious small edits; Terra for normal implementation; Sol for difficult implementation or justified independent review.
+- Reserve additional Astra subagents for exceptional high-risk independent review. This restriction does not apply to Astra Root.
+- Pass only needed context; request conclusions, file/symbol references, validation, and risks. Root integrates results and owns final acceptance.
 
 ## Task-completion token report
 

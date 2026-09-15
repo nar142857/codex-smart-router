@@ -2,42 +2,34 @@
 
 一套可直接复制/安装到 Codex 的多 Agent 路由配置，目标是：**尽量保持复杂任务质量，同时减少高价模型的无效 token 消耗。**
 
-## 默认拓扑
+## 可选角色映射
 
 ```text
-       Current Codex conversation model root
-             plan / decide / integrate
-                      |
-        +-------------+-------------+
-        |             |             |
-      Luna          Terra           Sol
-  cheap tasks      normal work    hard work
-        |             |             |
- explorer          worker         expert
- researcher                       reviewer
- tester
- fast_worker
-                      |
-             Astra deep_reviewer
-      exceptional high-risk only
+Current conversation model -> Root (may complete the whole task)
+
+Optional delegated roles:
+Luna  -> explorer / researcher / tester / fast_worker
+Terra -> worker
+Sol   -> expert / reviewer
+Astra -> deep_reviewer (exceptional high-risk review only)
 ```
+
+这张图是委派发生时的角色映射，不是固定拓扑或执行流水线。Root 会先判断任务是否存在独立、边界清楚且工作量足够的子任务；没有则直接完成。
 
 ## 路由原则
 
-- 小任务：root 直接做，不机械启动 subagents。
-- Luna：搜索、读代码、研究、测试、非常明确的低风险小改动。
-- Root：用户在 Codex 对话框模型选择器中选什么模型，该对话就用什么模型做 Root / Orchestrator；Smart Router 不会覆盖它。
-- Terra：承担常规 feature / refactor / bugfix；若用户在对话框选择 Terra，它同时就是该对话的 Root。
-- Sol：困难 Bug、算法、并发、性能、复杂集成、独立 Review。
-- Astra：只用于认证授权、安全边界、支付、破坏性迁移或极复杂架构等高风险场景的 `deep_reviewer`；不得用于日常搜索、实现、测试、总结或普通 Review。
-- 默认最多 4 个 subagent 并发。
+- Root：用户在 Codex 对话框模型选择器中选什么模型，该对话就用什么模型做 Root；包括 Astra 在内的 Root 都可以直接完成分析、实现、测试、Review 和整合。
+- 只委派边界清楚、可独立交付且工作量足以覆盖上下文传递、协调和整合成本的子任务。小任务、顺序依赖强或紧密耦合的工作由 Root 完成。
+- 不要求固定代理数量，也不要求 explorer → worker → tester → reviewer 的角色流水线。运行时并发上限只是容量限制，不是启动目标。
+- 委派发生时，优先用 Luna 做聚焦搜索、研究、验证和明确的小改动；Terra 做常规实现；Sol 做困难实现或有必要的独立 Review。
+- 额外的 Astra subagent 只用于失败代价很高的独立深度复核；这项限制不影响 Astra 作为 Root 正常工作。
 
 ## 版本要求
 
 建议使用最新 Codex App / Codex CLI。
 
 - GPT-5.6 在 Codex 至少需要较新的 0.144.x 以上版本。
-- GPT-6 Astra 仅在实际需要深度复核时才会被调用，且可能仍处于账户逐步开放阶段。
+- 额外的 GPT-6 Astra subagent 仅在实际需要高风险深度复核时才会被调用；用户选择 Astra 作为 Root 时不受此限制。
 
 默认情况下，安装器不会设置或替换 `model`、`model_reasoning_effort`。请直接在 Codex 对话框选择 Root 模型；新对话和当前对话都可独立选择。
 
@@ -196,11 +188,12 @@ token_usage_report = false
 
 ```text
 当前对话选中模型 -> Root / 规划 / 决策 / 整合
-简单任务 -> 不分流
-常规实现 -> Terra
-搜索/测试 -> Luna
-难点 -> Sol
-极高风险深度复核 -> Astra
+Root 可以直接完成整个任务
+仅当子任务独立、边界清楚且工作量足够时委派
+委派的聚焦搜索/验证 -> Luna
+委派的常规实现 -> Terra
+委派的困难实现或重要 Review -> Sol
+额外的极高风险深度复核 -> Astra
 ```
 
 ## 2. 显式调用路由 Skill
@@ -211,9 +204,9 @@ token_usage_report = false
 $smart-router
 
 实现完整的支付退款功能。
-先分析现有支付调用链，再制定实现边界。
-常规实现用 Terra，测试用 Luna；
-只有真正困难的实现才升级 Sol；极高风险时才启用 Astra deep review。
+由 Root 先确认边界并直接推进；只有存在可独立交付、工作量足够的子任务时才委派。
+不要固定代理数量，也不要套用角色流水线。
+需要委派时，根据实际难度选择 Luna、Terra 或 Sol；仅在失败代价很高且独立复核有明显价值时使用额外的 Astra deep reviewer。
 ```
 
 ## 3. Smoke Test
@@ -237,10 +230,11 @@ $smart-router
 ```text
 $smart-router
 
-实现一个中等复杂度功能。
-先探索现有路径；常规实现使用 Terra；
-验证使用 Luna；只有遇到真正难点才升级 Sol。
+检查当前仓库中三个互不依赖的模块，分别返回入口、关键依赖和现有测试；不要修改文件。
+这三个只读结果可以并行获取，Root 最后合并结论。
 ```
+
+这个示例专门验证独立任务的并行能力，不代表日常任务需要启动三个 subagent。
 
 ---
 
@@ -252,16 +246,16 @@ $smart-router
 | `researcher` | Luna | read-only | API / 框架 / 文档研究 |
 | `tester` | Luna | workspace-write | 测试、lint、typecheck、build |
 | `fast_worker` | Luna | workspace-write | 非常明确的低风险小改动 |
-| `worker` | Terra | workspace-write | 默认常规实现 |
+| `worker` | Terra | workspace-write | 委派的常规实现 |
 | `expert` | Sol | workspace-write | 困难实现、Debug、算法/并发/性能 |
 | `reviewer` | Sol | read-only | 独立代码 Review |
-| `deep_reviewer` | Astra | read-only | 仅极高风险最终复核 |
+| `deep_reviewer` | Astra | read-only | 仅失败代价很高的独立复核 |
 
 ---
 
 # Root 模型选择
 
-在 Codex 对话框的模型选择器中选择模型，即可决定该对话的 Root。模型选择只影响 Root；Smart Router 的子代理映射保持不变：Luna 用于探索/研究/测试，Terra 用于常规实现，Sol 用于困难任务和重要 Review，Astra 仅用于极高风险 deep review。
+在 Codex 对话框的模型选择器中选择模型，即可决定该对话的 Root。Root 可以直接完成任何范围内的工作，Smart Router 不会因为 Root 是 Astra 就把日常工作机械地委派出去。只有委派本身值得时，才按 Luna、Terra、Sol 和 Astra 的角色映射选择 subagent。
 
 ---
 

@@ -148,6 +148,13 @@ class InstallerEndToEndTest(unittest.TestCase):
             instructions = (codex / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("actually used the `$smart-router` skill to route", instructions)
             self.assertIn("Do not generate a token report for an ordinary single-agent task", instructions)
+            self.assertIn("There is no minimum agent count or required role sequence", instructions)
+            self.assertIn("This restriction does not apply to Astra Root", instructions)
+            skill = (Path(home) / ".agents" / "skills" / "smart-router" / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("Delegate only a concrete deliverable", skill)
+            self.assertIn("There is no minimum agent count", skill)
+            self.assertIn("without treating it as a target", skill)
+            self.assertNotIn("Target 2–4 active subagents by default", skill)
 
     def test_backup_names_do_not_collide_within_one_second(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -229,7 +236,8 @@ class RemoteBootstrapTest(unittest.TestCase):
             assert_smart_router_merge(self, doc)
             instructions = (project / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("# Existing project instructions", instructions)
-            self.assertIn("Root/orchestrator: use the model selected for the current Codex conversation.", instructions)
+            self.assertIn("There is no minimum agent count or required role sequence", instructions)
+            self.assertIn("This restriction does not apply to Astra Root", instructions)
             self.assertTrue((project / ".agents" / "skills" / "smart-router" / "SKILL.md").is_file())
             self.assertTrue((project / ".agents" / "skills" / "smart-router" / "scripts" / "token_report.py").is_file())
             self.assertIn("token_usage_report = true", (codex / "smart-router.toml").read_text(encoding="utf-8"))
