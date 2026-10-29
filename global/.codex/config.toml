@@ -24,6 +24,9 @@ config_file = "agents/fast_worker.toml"
 [agents.worker]
 config_file = "agents/worker.toml"
 
+[agents.browser_operator]
+config_file = "agents/browser_operator.toml"
+
 [agents.expert]
 config_file = "agents/expert.toml"
 

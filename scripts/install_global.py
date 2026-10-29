@@ -28,6 +28,7 @@ MANAGED_AGENT_ROLE_CONFIGS = {
     "tester": "agents/tester.toml",
     "fast_worker": "agents/fast_worker.toml",
     "worker": "agents/worker.toml",
+    "browser_operator": "agents/browser_operator.toml",
     "expert": "agents/expert.toml",
     "reviewer": "agents/reviewer.toml",
     "deep_reviewer": "agents/deep_reviewer.toml",
@@ -106,7 +107,7 @@ def merge_config(existing: str, default_model: str | None = None,
       2. the Smart Router managed block (`[agents]` table only)
       3. every other table from the original file, in original order
 
-    The bare `[agents]` table and the eight Smart Router role-registration
+    The bare `[agents]` table and the managed Smart Router role-registration
     subtables are replaced. Other user-defined `[agents.*]` subtables and all
     unrelated tables are preserved verbatim.
     """

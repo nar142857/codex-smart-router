@@ -53,6 +53,7 @@ def assert_smart_router_merge(tc, doc):
         "tester": "agents/tester.toml",
         "fast_worker": "agents/fast_worker.toml",
         "worker": "agents/worker.toml",
+        "browser_operator": "agents/browser_operator.toml",
         "expert": "agents/expert.toml",
         "reviewer": "agents/reviewer.toml",
         "deep_reviewer": "agents/deep_reviewer.toml",
@@ -61,6 +62,35 @@ def assert_smart_router_merge(tc, doc):
         tc.assertEqual(doc["agents"][role], {"config_file": config_file})
     tc.assertEqual(doc["projects"]["/Users/test/repo"]["trust_level"], "trusted")
     tc.assertEqual(doc["mcp_servers"]["foo"]["command"], "foo")
+
+
+def assert_installed_browser_routing(tc, codex, skills):
+    doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
+    tc.assertEqual(doc["agents"]["browser_operator"],
+                   {"config_file": "agents/browser_operator.toml"})
+    expected_models = {
+        "browser_operator": "gpt-6.1-terra",
+        "explorer": "gpt-5.6-luna", "researcher": "gpt-5.6-luna",
+        "tester": "gpt-5.6-luna", "fast_worker": "gpt-5.6-luna",
+        "worker": "gpt-5.6-terra", "expert": "gpt-5.6-sol",
+        "reviewer": "gpt-5.6-sol", "deep_reviewer": "gpt-6-astra",
+    }
+    for role, model in expected_models.items():
+        profile = tomllib.loads((codex / doc["agents"][role]["config_file"]).read_text(encoding="utf-8"))
+        tc.assertEqual(profile["model"], model, role)
+    skill = (skills / "smart-router" / "SKILL.md").read_text(encoding="utf-8")
+    tc.assertIn("browser_operator", skill)
+    tc.assertIn("Keep complex engineering analysis, implementation, and review on the existing routing", skill)
+    instructions_path = codex / "AGENTS.md"
+    if not instructions_path.exists():
+        instructions_path = codex.parent / "AGENTS.md"
+    instructions = instructions_path.read_text(encoding="utf-8")
+    for policy in (skill, instructions):
+        tc.assertIn("All tasks requiring computer or browser UI operation must be delegated", policy)
+        tc.assertIn("Root must not operate the UI directly", policy)
+        tc.assertNotIn("Keep trivial or tightly coupled browser steps with Root", policy)
+        tc.assertNotIn("For delegated browser operation, prefer", policy)
+    tc.assertIn("Root must not take over UI execution or silently substitute another model", skill)
 
 
 class MergeConfigTest(unittest.TestCase):
@@ -151,7 +181,9 @@ class InstallerEndToEndTest(unittest.TestCase):
             self.assertIn("There is no minimum agent count or required role sequence", instructions)
             self.assertIn("This restriction does not apply to Astra Root", instructions)
             skill = (Path(home) / ".agents" / "skills" / "smart-router" / "SKILL.md").read_text(encoding="utf-8")
-            self.assertIn("Delegate only a concrete deliverable", skill)
+            assert_installed_browser_routing(self, codex, Path(home) / ".agents" / "skills")
+            self.assertIn("gpt-6.1-terra", instructions)
+            self.assertIn("delegate only a concrete deliverable", skill)
             self.assertIn("There is no minimum agent count", skill)
             self.assertIn("without treating it as a target", skill)
             self.assertNotIn("Target 2–4 active subagents by default", skill)
@@ -235,6 +267,8 @@ class RemoteBootstrapTest(unittest.TestCase):
             doc = tomllib.loads((codex / "config.toml").read_text(encoding="utf-8"))
             assert_smart_router_merge(self, doc)
             instructions = (project / "AGENTS.md").read_text(encoding="utf-8")
+            assert_installed_browser_routing(self, codex, project / ".agents" / "skills")
+            self.assertIn("gpt-6.1-terra", instructions)
             self.assertIn("# Existing project instructions", instructions)
             self.assertIn("There is no minimum agent count or required role sequence", instructions)
             self.assertIn("This restriction does not apply to Astra Root", instructions)

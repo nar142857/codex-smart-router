@@ -2,26 +2,30 @@
 
 一套可直接复制/安装到 Codex 的多 Agent 路由配置，目标是：**尽量保持复杂任务质量，同时减少高价模型的无效 token 消耗。**
 
-## 可选角色映射
+## 角色映射
 
 ```text
-Current conversation model -> Root (may complete the whole task)
+Current conversation model -> Root (engineering decisions and non-UI work)
 
-Optional delegated roles:
+Engineering roles are optional; UI execution must be delegated:
 Luna  -> explorer / researcher / tester / fast_worker
 Terra -> worker
+gpt-6.1-terra -> browser_operator (all computer/browser UI execution required)
 Sol   -> expert / reviewer
 Astra -> deep_reviewer (exceptional high-risk review only)
 ```
 
-这张图是委派发生时的角色映射，不是固定拓扑或执行流水线。Root 会先判断任务是否存在独立、边界清楚且工作量足够的子任务；没有则直接完成。
+这张图是委派发生时的角色映射，不是固定拓扑或执行流水线。电脑和浏览器 UI 操作必须委派；其它研发工作由 Root 判断是否存在独立、边界清楚且值得委派的子任务，没有则直接完成。
 
 ## 路由原则
 
 - Root：用户在 Codex 对话框模型选择器中选什么模型，该对话就用什么模型做 Root；包括 Astra 在内的 Root 都可以直接完成分析、实现、测试、Review 和整合。
-- 只委派边界清楚、可独立交付且工作量足以覆盖上下文传递、协调和整合成本的子任务。小任务、顺序依赖强或紧密耦合的工作由 Root 完成。
+- 对于非 UI 研发工作，只委派边界清楚、可独立交付且工作量足以覆盖上下文传递、协调和整合成本的子任务。非 UI 小任务、顺序依赖强或紧密耦合的工作由 Root 完成。
 - 不要求固定代理数量，也不要求 explorer → worker → tester → reviewer 的角色流水线。运行时并发上限只是容量限制，不是启动目标。
 - 委派发生时，优先用 Luna 做聚焦搜索、研究、验证和明确的小改动；Terra 做常规实现；Sol 做困难实现或有必要的独立 Review。
+- 所有需要操作电脑或浏览器 UI 的任务，都必须委派给 `browser_operator`（`gpt-6.1-terra`）子代理执行，包括原生应用、截图、点击、输入、滚动、页面导航、表单和 UI 验证。简单、顺序依赖强或紧密耦合的 UI 步骤也不例外；Root 即使用相同模型，也不能直接执行 UI 操作。
+- 混合任务由 Root 保留研发判断，将全部 UI 执行交给 Terra 子代理；复杂研发分析、实现和 Review 保留原路由，`worker` 等现有角色模型不变。无需操作 UI 的 Shell 命令、代码编辑、API 和连接器调用仍按原路由处理，适用时优先使用专用工具。
+- 若该角色、模型、UI 工具或并发名额不可用，报告阻塞并等待或请用户决定；Root 不接管 UI，也不擅自替换模型。UI 强制委派优先于一般的委派成本判断。
 - 额外的 Astra subagent 只用于失败代价很高的独立深度复核；这项限制不影响 Astra 作为 Root 正常工作。
 
 ## 版本要求
@@ -188,9 +192,11 @@ token_usage_report = false
 
 ```text
 当前对话选中模型 -> Root / 规划 / 决策 / 整合
-Root 可以直接完成整个任务
-仅当子任务独立、边界清楚且工作量足够时委派
+Root 可以直接完成非 UI 工作
+电脑和浏览器 UI 操作一律委派给 GPT-6.1 Terra 子代理
+其它研发工作仅当子任务独立、边界清楚且工作量足够时委派
 委派的聚焦搜索/验证 -> Luna
+必须委派的电脑和浏览器 UI 执行 -> browser_operator / gpt-6.1-terra
 委派的常规实现 -> Terra
 委派的困难实现或重要 Review -> Sol
 额外的极高风险深度复核 -> Astra
@@ -204,7 +210,8 @@ Root 可以直接完成整个任务
 $smart-router
 
 实现完整的支付退款功能。
-由 Root 先确认边界并直接推进；只有存在可独立交付、工作量足够的子任务时才委派。
+由 Root 先确认边界并推进；电脑和浏览器 UI 操作一律交给 GPT-6.1 Terra 子代理执行。
+其它研发工作只有存在可独立交付、工作量足够的子任务时才委派。
 不要固定代理数量，也不要套用角色流水线。
 需要委派时，根据实际难度选择 Luna、Terra 或 Sol；仅在失败代价很高且独立复核有明显价值时使用额外的 Astra deep reviewer。
 ```
@@ -247,6 +254,7 @@ $smart-router
 | `tester` | Luna | workspace-write | 测试、lint、typecheck、build |
 | `fast_worker` | Luna | workspace-write | 非常明确的低风险小改动 |
 | `worker` | Terra | workspace-write | 委派的常规实现 |
+| `browser_operator` | `gpt-6.1-terra` | workspace-write | 所有电脑和浏览器 UI 操作（强制委派） |
 | `expert` | Sol | workspace-write | 困难实现、Debug、算法/并发/性能 |
 | `reviewer` | Sol | read-only | 独立代码 Review |
 | `deep_reviewer` | Astra | read-only | 仅失败代价很高的独立复核 |
@@ -255,7 +263,7 @@ $smart-router
 
 # Root 模型选择
 
-在 Codex 对话框的模型选择器中选择模型，即可决定该对话的 Root。Root 可以直接完成任何范围内的工作，Smart Router 不会因为 Root 是 Astra 就把日常工作机械地委派出去。只有委派本身值得时，才按 Luna、Terra、Sol 和 Astra 的角色映射选择 subagent。
+在 Codex 对话框的模型选择器中选择模型，即可决定该对话的 Root。Root 可以直接完成非 UI 工作，电脑和浏览器 UI 操作必须交给 GPT-6.1 Terra 子代理执行；Smart Router 不会因为 Root 是 Astra 就把日常工作机械地委派出去。只有委派本身值得时，才按 Luna、Terra、Sol 和 Astra 的角色映射选择 subagent。
 
 ---
 
@@ -303,6 +311,7 @@ codex-smart-router/
 │   │       ├── tester.toml
 │   │       ├── fast_worker.toml
 │   │       ├── worker.toml
+│   │       ├── browser_operator.toml
 │   │       ├── expert.toml
 │   │       ├── reviewer.toml
 │   │       └── deep_reviewer.toml
